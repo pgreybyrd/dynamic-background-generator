@@ -12,7 +12,11 @@ from image_composer import compose_wallpaper
 
 # ~~~~~ CONSTANTS ~~~~~
 DEBUG = True
-DEBUG_HOUR_OVERRIDE = None
+DEBUG_HOUR_OVERRIDE = None 
+DEBUG_TIME_OVERRIDE = 'noon' # time of day like 'dawn', 'noon', 'dusk', etc.
+DEBUG_WEATHER_OVERRIDE = "very_heavy_rain" # weather code like 'clear', 'rain', 'snow', etc.
+DEBUG_SEASON_OVERRIDE = None
+DEBUG_HOLIDAY_OVERRIDE = None
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -50,36 +54,10 @@ def save_state(state):
         json.dump(state, f, indent=4)
 
 # Map the hour ranges to the time of day
-def get_time_bucket(hour):
-    if hour in (0, 1, 2):
-        return "night"
-    if hour in (3, 4, 20, 21, 22, 23):
-        return "twilight"
-    if hour == 5:
-        return "dawn"
-    if hour == 6:
-        return "sunrise"
-    if hour in (7, 8):
-        return "early_morning"
-    if hour == 9:
-        return "mid_morning"
-    if hour in (10, 11):
-        return "late_morning"
-    if hour == 12:
-        return "noon"
-    if hour in (13, 14):
-        return "early_afternoon"    
-    if hour == 15:
-        return "mid_afternoon"
-    if hour in (16, 17):
-         return "late_afternoon"
-    if hour == 18:
-        return "sunset"
-    if hour == 19:
-        return "dusk"
-    return "night"
-
 def get_time_bucket_by_sun(now, sunrise, sunset):
+    if DEBUG and DEBUG_TIME_OVERRIDE is not None:
+        debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
+        return DEBUG_TIME_OVERRIDE
     if now < sunrise - datetime.timedelta(hours=2):
         return "night"
     if now < sunrise - datetime.timedelta(minutes=45):
@@ -121,17 +99,6 @@ def get_time_bucket_by_sun(now, sunrise, sunset):
     return "night"
 
 # Get the shade layer based on the hour
-def get_shade(hour):
-    if hour in (0, 1, 2):
-        return "night"
-    if hour in (3, 4, 20, 21, 22, 23):
-        return "twilight"
-    if hour == 19:
-        return "dusk"
-    if hour == 18:
-        return "sunset"
-    return "none"
-
 def get_shade_by_bucket(bucket):
     if bucket in ("night", "twilight", "dusk", "sunset"):
         return bucket
@@ -139,6 +106,8 @@ def get_shade_by_bucket(bucket):
 
 # Get the season
 def get_season(month):
+    if DEBUG and DEBUG_SEASON_OVERRIDE is not None:
+        return DEBUG_SEASON_OVERRIDE
     if month in (3, 4, 5):
         return "spring"
     if month in (6, 7, 8):
@@ -226,6 +195,10 @@ def fourth_thursday_of_november(year):
     return fourth_thursday.day
 
 def get_holiday(day, month, year):
+    # Debug override
+    if DEBUG and DEBUG_HOLIDAY_OVERRIDE:
+        debug_log(f"Overriding holiday for {day}-{month}-{year}")
+        return DEBUG_HOLIDAY_OVERRIDE
     # Easter
     easter_date = calculate_easter(year)
     if month == easter_date.month and day == easter_date.day:
@@ -346,6 +319,9 @@ def set_weather_code():
     }
 
 def normalize_weather(weather):
+    if DEBUG and DEBUG_WEATHER_OVERRIDE is not None:
+        debug_log(f"Overriding weather with ID {DEBUG_WEATHER_OVERRIDE}")
+        weather = DEBUG_WEATHER_OVERRIDE
     return weather if weather != "unknown" else "clear"
 
 def set_wallpaper(path):
