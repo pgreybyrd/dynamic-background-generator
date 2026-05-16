@@ -13,8 +13,8 @@ from image_composer import compose_wallpaper
 # ~~~~~ CONSTANTS ~~~~~
 DEBUG = True
 DEBUG_HOUR_OVERRIDE = None 
-DEBUG_TIME_OVERRIDE = 'noon' # time of day like 'dawn', 'noon', 'dusk', etc.
-DEBUG_WEATHER_OVERRIDE = "very_heavy_rain" # weather code like 'clear', 'rain', 'snow', etc.
+DEBUG_TIME_OVERRIDE = None # time of day like 'dawn', 'noon', 'dusk', etc.
+DEBUG_WEATHER_OVERRIDE = None # weather code like 'clear', 'rain', 'snow', etc.
 DEBUG_SEASON_OVERRIDE = None
 DEBUG_HOLIDAY_OVERRIDE = None
 

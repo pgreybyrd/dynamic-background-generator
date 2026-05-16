@@ -36,6 +36,13 @@ Build a creative automation tool combining real-world data with visual generatio
 - More seasonal variations
 - Performance optimizations
 
+## Screenshots
+### Sunrise
+![Sunrise](screenshots/sunrise_clear.png)
+
+### Thunderstorm
+![Foggy Morning](screenshots/early_morning_fog.png)
+
 ## Credit to: 
 - Stardew Valley for some parts of the images (the hills and stars)
 - Retronator for some of the clouds
