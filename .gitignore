@@ -1,0 +1,12 @@
+__pycache__/
+output/
+config.json
+*.pyc
+.venv/
+venv/
+scheduler_test.py
+scheduler_log.txt
+main.pyw
+assets/artwork.aseprite
+assets/ARCHIVE
+state.json
