@@ -12,10 +12,13 @@ from image_composer import compose_wallpaper
 
 # ~~~~~ CONSTANTS ~~~~~
 DEBUG = True
+DEBUG_HOUR_OVERRIDE = None
 
 BASE_DIR = Path(__file__).resolve().parent
+
 CONFIG_PATH = BASE_DIR / "config.json"
 STATE_PATH = BASE_DIR / "state.json"
+LOG_PATH = BASE_DIR / "debug_log.txt"
 
 ASSETS_DIR = BASE_DIR / "assets"
 OUTPUT_DIR = BASE_DIR / "output"
@@ -23,11 +26,18 @@ OUTPUT_DIR = BASE_DIR / "output"
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)
 
-lat = config["lat"]
-lon = config["lon"]
+LAT = config["lat"]
+LON = config["lon"]
 # ~~~~~ END CONSTANTS ~~~~~
 
 # ~~~~~ FUNCTIONS ~~~~~
+def debug_log(message):
+    if DEBUG:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {message}\n")
+        print(message)
+        
 def load_state():
     if not STATE_PATH.exists():
         return {}
@@ -69,6 +79,47 @@ def get_time_bucket(hour):
         return "dusk"
     return "night"
 
+def get_time_bucket_by_sun(now, sunrise, sunset):
+    if now < sunrise - datetime.timedelta(hours=2):
+        return "night"
+    if now < sunrise - datetime.timedelta(minutes=45):
+        return "twilight"
+    if now < sunrise:
+        return "dawn"
+    if now < sunrise + datetime.timedelta(minutes=45):
+        return "sunrise"
+
+    if now < sunset - datetime.timedelta(hours=2):
+        daylight_start = sunrise + datetime.timedelta(minutes=45)
+        daylight_end = sunset - datetime.timedelta(hours=2)
+
+        daytime_buckets = [
+            "early_morning",
+            "mid_morning",
+            "late_morning",
+            "noon",
+            "early_afternoon",
+            "mid_afternoon",
+            "late_afternoon",
+        ]
+
+        total_seconds = (daylight_end - daylight_start).total_seconds()
+        elapsed_seconds = (now - daylight_start).total_seconds()
+
+        index = int((elapsed_seconds / total_seconds) * len(daytime_buckets))
+        index = max(0, min(index, len(daytime_buckets) - 1))
+
+        return daytime_buckets[index]
+
+    if now < sunset:
+        return "sunset"
+    if now < sunset + datetime.timedelta(minutes=45):
+        return "dusk"
+    if now < sunset + datetime.timedelta(hours=2):
+        return "twilight"
+
+    return "night"
+
 # Get the shade layer based on the hour
 def get_shade(hour):
     if hour in (0, 1, 2):
@@ -79,6 +130,11 @@ def get_shade(hour):
         return "dusk"
     if hour == 18:
         return "sunset"
+    return "none"
+
+def get_shade_by_bucket(bucket):
+    if bucket in ("night", "twilight", "dusk", "sunset"):
+        return bucket
     return "none"
 
 # Get the season
@@ -240,26 +296,29 @@ def get_holiday(day, month, year):
     return 'none'
 
 # Weather layer
-def get_weather(api_key, lat, lon):
+def get_weather(api_key):
     base_url = "http://api.openweathermap.org/data/2.5/weather"
     params = {
-        'lat': lat,
-        'lon': lon,
+        'lat': LAT,
+        'lon': LON,
         'appid': api_key,
         'units': 'imperial'  #'imperial' for Fahrenheit
     }
+    if DEBUG:
+        debug_log(f"Fetching weather data for lat = {LAT}, lon = {LON}")
+
     response = requests.get(base_url, params=params, timeout=10)
     response.raise_for_status()
     return response.json()
 
-def set_weather_code(lat, lon):
+def set_weather_code():
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
         # Missing OPENWEATHER_API_KEY environment variable
         return "unknown"
 
     try:
-        weather_data = get_weather(api_key, lat, lon)
+        weather_data = get_weather(api_key)
 
         weather = weather_data["weather"][0]
 
@@ -267,8 +326,8 @@ def set_weather_code(lat, lon):
         description = weather["description"]
 
         if DEBUG:
-            print(f"Weather ID: {weather_id}")
-            print(f"Description: {description}")
+            debug_log(f"Weather ID: {weather_id}")
+            debug_log(f"Description: {description}")
 
     except (
         requests.RequestException,
@@ -277,10 +336,14 @@ def set_weather_code(lat, lon):
         TypeError,
         ValueError
     ) as e:
-        print(f"Weather fetch failed: {e}")
+        debug_log(f"Weather fetch failed: {e}")
         return "unknown"
     
-    return WEATHER_CODES.get(weather_id, "unknown")
+    return {
+        "weather": WEATHER_CODES.get(weather_id, "unknown"),
+        "sunrise": weather_data["sys"]["sunrise"],
+        "sunset": weather_data["sys"]["sunset"],
+    }
 
 def normalize_weather(weather):
     return weather if weather != "unknown" else "clear"
@@ -293,9 +356,16 @@ def set_wallpaper(path):
 # ~~~~~ MAIN ~~~~~
 def main():
 
-    weather = normalize_weather(set_weather_code(lat, lon))
+    weather_info = set_weather_code()
+
+    weather = normalize_weather(weather_info["weather"])
+
+    sunrise = datetime.datetime.fromtimestamp(weather_info["sunrise"])
+    sunset = datetime.datetime.fromtimestamp(weather_info["sunset"])
   
     now = datetime.datetime.now()
+    if DEBUG_HOUR_OVERRIDE is not None:
+        now = now.replace(hour=DEBUG_HOUR_OVERRIDE)
     year = now.year
     month = now.month
     day = now.day
@@ -305,9 +375,16 @@ def main():
     holiday = get_holiday(day, month, year)
 
     hour = now.hour
-    bucket = get_time_bucket(hour)
 
-    shade = get_shade(hour)
+    bucket = get_time_bucket_by_sun(now, sunrise, sunset)
+
+    shade = get_shade_by_bucket(bucket)
+
+    if DEBUG:
+        debug_log(f"Now: {now}")
+        debug_log(f"Sunrise: {sunrise}")
+        debug_log(f"Sunset: {sunset}")
+        debug_log(f"Bucket: {bucket}")
 
     current_state = {
         "weather": weather,
@@ -321,7 +398,7 @@ def main():
 
     if current_state == previous_state:
         if DEBUG:
-            print("No wallpaper update needed.")
+            debug_log("No wallpaper update needed.")
         return
 
     save_state(current_state)
@@ -344,13 +421,13 @@ def main():
     )
 
     if DEBUG:
-        print(f"Hour: {hour}")
-        print(f"Bucket: {bucket}")
-        print(f"Season: {season}")
-        print(f"Holiday: {holiday}")
-        print(f"Weather: {weather}")
-        print(f"Shade: {shade}")
-        #print(f"Wallpaper: {str(final_wallpaper)}")
+        debug_log(f"Hour: {hour}")
+        debug_log(f"Bucket: {bucket}")
+        debug_log(f"Season: {season}")
+        debug_log(f"Holiday: {holiday}")
+        debug_log(f"Weather: {weather}")
+        debug_log(f"Shade: {shade}")
+        #debug_log(f"Wallpaper: {str(final_wallpaper)}")
 
     set_wallpaper(str(final_wallpaper))
 # ~~~~~ END MAIN ~~~~~
