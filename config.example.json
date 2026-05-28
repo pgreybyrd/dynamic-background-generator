@@ -1,4 +1,12 @@
 {
+    "location_mode": "latlon",
+
+    "city": "Nowhere",
+
     "lat": 0.0,
-    "lon": 0.0
+    "lon": 0.0,
+
+    "units": "imperial",
+
+    "update_minutes": 5
 }

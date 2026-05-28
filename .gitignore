@@ -6,9 +6,10 @@ config.json
 venv/
 scheduler_test.py
 scheduler_log.txt
-main.pyw
 assets/artwork.aseprite
 assets/ARCHIVE
+assets/_helpers/gradient_png_maker.py
 state.json
 debug_log.txt
 screenshots/TODO.txt
+TODO.txt

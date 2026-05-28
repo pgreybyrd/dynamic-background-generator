@@ -40,6 +40,9 @@ Build a creative automation tool combining real-world data with visual generatio
 ### Sunrise
 ![Sunrise](screenshots/sunrise_clear.png)
 
+### Overcast
+![Foggy Morning](screenshots/mid_afternoon_overcast.png)
+
 ### Thunderstorm
 ![Foggy Morning](screenshots/early_morning_fog.png)
 
