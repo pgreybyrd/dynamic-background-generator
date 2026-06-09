@@ -15,7 +15,6 @@ except ImportError:
     comtypes = None
 
 from pathlib import Path 
-
 # ~~~~~ END IMPORTS ~~~~~
 
 
@@ -64,48 +63,7 @@ from wallpaper.seasons import get_season
 from wallpaper.holidays import get_holiday
 from wallpaper.weather import get_weather_state, normalize_weather
 from wallpaper.overlay import add_weather_overlay
-
-
-def optional_layer(path):
-    """Return a layer path only when the file exists, otherwise skip it."""
-    return path if path and path.exists() else None
-
-
-def get_layer_paths(bucket, stars, season, holiday, weather, shade, layout="one_monitor"):
-    layers = []
-
-    sky_path = ASSETS_DIR / "sky" / layout / f"{bucket}.png"
-    stars_path = ASSETS_DIR / "stars" / layout / f"{stars}.png"
-    weather_path = ASSETS_DIR / "weather" / layout / f"{weather}.png"
-
-    layers.append(optional_layer(sky_path))
-    layers.append(optional_layer(stars_path))
-
-    if layout == "vertical":
-        holiday_path = ASSETS_DIR / "holiday" / "vertical" / f"{holiday}.png" if holiday != "none" else None
-
-        layers.extend([
-            optional_layer(weather_path),
-            optional_layer(holiday_path),
-            # moon later
-            # ui overlay later
-        ])
-
-    else:
-        season_path = ASSETS_DIR / "season" / layout / f"{season}.png"
-        holiday_path = ASSETS_DIR / "holiday" / layout / f"{holiday}.png" if holiday != "none" else None
-        shade_path = ASSETS_DIR / "shade" / layout / f"{shade}.png" if shade != "none" else None
-        holiday_lights_path = ASSETS_DIR / "holiday_lights" / layout / f"{holiday}.png" if holiday != "none" else None
-
-        layers.extend([
-            optional_layer(season_path),
-            optional_layer(holiday_path),
-            optional_layer(weather_path),
-            optional_layer(shade_path),
-            optional_layer(holiday_lights_path),
-        ])
-
-    return layers
+from wallpaper.assets import get_layer_paths
 
 
 class IDesktopWallpaper(comtypes.IUnknown if comtypes is not None else object):
@@ -247,8 +205,8 @@ def main():
         top_output_path = OUTPUT_DIR / "current_wallpaper_top.png"
         top_overlay_output_path = OUTPUT_DIR / "current_wallpaper_top_overlay.png"
 
-        bottom_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, "horizontal")
-        top_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, "vertical")
+        bottom_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "horizontal")
+        top_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "vertical")
 
         bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
         top_wallpaper = compose_wallpaper(top_layers, top_output_path)
@@ -263,7 +221,7 @@ def main():
         final_wallpaper = bottom_wallpaper
     else:
         output_path = OUTPUT_DIR / "current_wallpaper.png"
-        layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, "one_monitor")
+        layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "one_monitor")
         final_wallpaper = compose_wallpaper(layers, output_path)
 
     if DEBUG:

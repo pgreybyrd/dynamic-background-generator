@@ -20,9 +20,9 @@ WEATHER_CODES = {
     314: "heavy_shower_rain_drizzle",
     321: "shower_drizzle",
 
-    500: "light_rain", #done
-    501: "moderate_rain", #done
-    502: "heavy_rain", #done
+    500: "light_rain",
+    501: "moderate_rain",
+    502: "heavy_rain",
     503: "very_heavy_rain", 
     504: "extreme_rain",
     511: "freezing_rain",
@@ -47,16 +47,16 @@ WEATHER_CODES = {
     711: "smoke",
     721: "haze",
     731: "dust",
-    741: "fog", #done
+    741: "fog",
     751: "sand",
     761: "dust",
     762: "volcanic_ash",
     771: "squalls",
     781: "tornado",
 
-    800: "clear", #done
-    801: "few_clouds", #done
-    802: "scattered_clouds", #done
+    800: "clear",
+    801: "few_clouds",
+    802: "scattered_clouds",
     803: "broken_clouds", 
-    804: "overcast_clouds", #done
+    804: "overcast_clouds",
 }
