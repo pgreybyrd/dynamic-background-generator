@@ -17,16 +17,11 @@ except ImportError:
 from pathlib import Path 
 from weather_codes import WEATHER_CODES
 from image_composer import compose_wallpaper
+
+
 # ~~~~~ END IMPORTS ~~~~~
 
 # ~~~~~ CONSTANTS ~~~~~
-DEBUG = True 
-DEBUG_HOUR_OVERRIDE = None # int from 0-23, or None to disable 
-DEBUG_TIME_OVERRIDE = None # time of day like 'dawn', 'noon', 'dusk', etc., or None to disable
-DEBUG_WEATHER_OVERRIDE = None # weather code like 'clear', 'rain', 'snow', etc., or None to disable
-DEBUG_SEASON_OVERRIDE = None # 'spring', 'summer', 'autumn', 'winter', or None to disable
-DEBUG_HOLIDAY_OVERRIDE = None # 'valentines', 'halloween', 'thanksgiving', 'christmas_eve', 'christmas_day', etc., or None to disable
-
 BASE_DIR = Path(__file__).resolve().parent
 
 CONFIG_PATH = BASE_DIR / "config.json"
@@ -36,22 +31,38 @@ LOG_PATH = BASE_DIR / "debug_log.txt"
 ASSETS_DIR = BASE_DIR / "assets"
 OUTPUT_DIR = BASE_DIR / "output"
 
+DEBUG_HOUR_OVERRIDE = None # int from 0-23, or None to disable 
+DEBUG_TIME_OVERRIDE = None # time of day like 'dawn', 'noon', 'dusk', etc., or None to disable
+DEBUG_WEATHER_OVERRIDE = None # weather code like 'clear', 'rain', 'snow', etc., or None to disable
+DEBUG_SEASON_OVERRIDE = None # 'spring', 'summer', 'autumn', 'winter', or None to disable
+DEBUG_HOLIDAY_OVERRIDE = None # 'valentines', 'halloween', 'thanksgiving', 'christmas_eve', 'christmas_day', etc., or None to disable
+
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)
+
+DEBUG = config.get("debug", False)
 
 LAT = config["lat"]
 LON = config["lon"]
 
 UNITS = config["units"]  
+
+#from wallpaper.holidays import calculate_easter, second_sunday_of_may, third_sunday_of_june, fourth_thursday_of_november, get_holiday
+#from wallpaper.time_buckets import get_time_bucket_by_sun
+from wallpaper.logging import debug_log as _debug_log
+
+def debug_log(message):
+    _debug_log(message, debug=DEBUG, log_path=LOG_PATH)
+
+# debug_log(
+#     "Testing",
+#     debug=DEBUG,
+#     log_path=LOG_PATH
+# )
 # ~~~~~ END CONSTANTS ~~~~~
 
 # ~~~~~ FUNCTIONS ~~~~~
-def debug_log(message):
-    if DEBUG:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] {message}\n")
-        print(message)
+
         
 def load_state():
     if not STATE_PATH.exists():
@@ -63,72 +74,6 @@ def load_state():
 def save_state(state):
     with open(STATE_PATH, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=4)
-
-# # Map the time of day to sunrise/sunset anchored sky buckets.
-# # The bucket names here must match PNG filenames in assets/sky.
-# def get_time_bucket_by_sun(now, sunrise, sunset):
-#     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
-#         debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
-#         return DEBUG_TIME_OVERRIDE
-
-#     # Morning is anchored to today's sunrise.
-#     # These are intentionally short/soft so the sky eases into daylight.
-#     morning_schedule = [
-#         (sunrise - datetime.timedelta(hours=5), "midnight"),
-#         (sunrise - datetime.timedelta(hours=3), "night"),
-#         (sunrise - datetime.timedelta(hours=2), "deep_twilight"),
-#         (sunrise - datetime.timedelta(minutes=90), "pre_dawn"),
-#         (sunrise - datetime.timedelta(minutes=45), "dawn"),
-#         (sunrise + datetime.timedelta(minutes=45), "sunrise"),
-#     ]
-
-#     for end_time, bucket in morning_schedule:
-#         if now < end_time:
-#             return bucket
-
-#     # Evening is anchored to today's sunset.
-#     # The goal: keep late afternoon / early evening blue for longer,
-#     # then let the dramatic colors happen near sunset.
-#     evening_schedule = [
-#         (sunset - datetime.timedelta(hours=3), "DAYLIGHT"),
-#         (sunset - datetime.timedelta(hours=2), "early_evening"),
-#         (sunset - datetime.timedelta(hours=1), "golden_hour"),
-#         (sunset - datetime.timedelta(minutes=20), "sunset_start"),
-#         (sunset + datetime.timedelta(minutes=15), "sunset_peak"),
-#         (sunset + datetime.timedelta(minutes=35), "afterglow"),
-#         (sunset + datetime.timedelta(minutes=60), "dusk"),
-#         (sunset + datetime.timedelta(minutes=90), "deep_dusk"),
-#         (sunset + datetime.timedelta(minutes=125), "twilight"),
-#         (sunset + datetime.timedelta(minutes=160), "deep_twilight"),
-#     ]
-
-#     if now < evening_schedule[0][0]:
-#         daylight_start = sunrise + datetime.timedelta(minutes=45)
-#         daylight_end = sunset - datetime.timedelta(hours=3)
-
-#         daytime_buckets = [
-#             "early_morning",
-#             "mid_morning",
-#             "late_morning",
-#             "noon",
-#             "early_afternoon",
-#             "mid_afternoon",
-#             "late_afternoon",
-#         ]
-
-#         total_seconds = max(1, (daylight_end - daylight_start).total_seconds())
-#         elapsed_seconds = (now - daylight_start).total_seconds()
-
-#         index = int((elapsed_seconds / total_seconds) * len(daytime_buckets))
-#         index = max(0, min(index, len(daytime_buckets) - 1))
-
-#         return daytime_buckets[index]
-
-#     for end_time, bucket in evening_schedule[1:]:
-#         if now < end_time:
-#             return bucket
-
-#     return "night"
 
 def get_time_bucket_by_sun(now, sunrise, sunset):
     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
