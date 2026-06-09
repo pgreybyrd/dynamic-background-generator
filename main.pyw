@@ -15,7 +15,7 @@ except ImportError:
     comtypes = None
 
 from pathlib import Path 
-from image_composer import compose_wallpaper
+
 # ~~~~~ END IMPORTS ~~~~~
 
 
@@ -58,6 +58,7 @@ def load_state():
 def save_state(state):
     _save_state(state, STATE_PATH)  
 
+from wallpaper.image_composer import compose_wallpaper
 from wallpaper.time_buckets import get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
 from wallpaper.seasons import get_season
 from wallpaper.holidays import get_holiday
