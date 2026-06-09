@@ -54,26 +54,20 @@ from wallpaper.logging import debug_log as _debug_log
 def debug_log(message):
     _debug_log(message, debug=DEBUG, log_path=LOG_PATH)
 
-# debug_log(
-#     "Testing",
-#     debug=DEBUG,
-#     log_path=LOG_PATH
-# )
+from wallpaper.state import load_state as _load_state, save_state as _save_state
+
+def load_state():
+    return _load_state(STATE_PATH)
+
+def save_state(state):
+    _save_state(state, STATE_PATH)  
+
 # ~~~~~ END CONSTANTS ~~~~~
 
 # ~~~~~ FUNCTIONS ~~~~~
 
         
-def load_state():
-    if not STATE_PATH.exists():
-        return {}
 
-    with open(STATE_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-    
-def save_state(state):
-    with open(STATE_PATH, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=4)
 
 def get_time_bucket_by_sun(now, sunrise, sunset):
     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
