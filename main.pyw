@@ -66,17 +66,10 @@ from wallpaper.time_buckets import get_time_bucket_by_sun as _get_time_bucket_by
 def get_time_bucket_by_sun(now, sunrise, sunset):
     return _get_time_bucket_by_sun(now, sunrise, sunset, debug=DEBUG, debug_time_override=DEBUG_TIME_OVERRIDE)
 
-# Get the season
+from wallpaper.seasons import get_season as _get_season
+
 def get_season(month):
-    if DEBUG and DEBUG_SEASON_OVERRIDE is not None:
-        return DEBUG_SEASON_OVERRIDE
-    if month in (3, 4, 5):
-        return "spring"
-    if month in (6, 7, 8):
-        return "summer"
-    if month in (9, 10, 11):
-        return "autumn"
-    return "winter"
+    return _get_season(month, debug=DEBUG, debug_season_override=DEBUG_SEASON_OVERRIDE)
 
 # Calculate the holidays that aren't on a set date each year
 def calculate_easter(year):
