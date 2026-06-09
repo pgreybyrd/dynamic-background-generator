@@ -3,8 +3,6 @@ from calendar import month
 import ctypes
 import datetime
 from multiprocessing.util import debug
-import requests
-import os
 import json
 
 try:
@@ -17,9 +15,9 @@ except ImportError:
     comtypes = None
 
 from pathlib import Path 
-from weather_codes import WEATHER_CODES
 from image_composer import compose_wallpaper
 # ~~~~~ END IMPORTS ~~~~~
+
 
 # ~~~~~ CONSTANTS ~~~~~
 BASE_DIR = Path(__file__).resolve().parent
@@ -47,88 +45,24 @@ LON = config["lon"]
 UNITS = config["units"]  
 # ~~~~~ END CONSTANTS ~~~~~
 
+
 # ~~~~~ FUNCTIONS ~~~~~
 from wallpaper.logging import debug_log as _debug_log
-
 def debug_log(message):
     _debug_log(message, debug=DEBUG, log_path=LOG_PATH)
 
-from wallpaper.state import load_state as _load_state, save_state as _save_state
 
+from wallpaper.state import load_state as _load_state, save_state as _save_state
 def load_state():
     return _load_state(STATE_PATH)
-
 def save_state(state):
     _save_state(state, STATE_PATH)  
 
 from wallpaper.time_buckets import get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
-
 from wallpaper.seasons import get_season
-
 from wallpaper.holidays import get_holiday
+from wallpaper.weather import get_weather_state, normalize_weather
 
-# Weather layer
-def get_weather(api_key):
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        'lat': LAT,
-        'lon': LON,
-        'appid': api_key,
-        'units': UNITS
-    }
-    if DEBUG:
-        debug_log(f"Fetching weather data for lat = {LAT}, lon = {LON}")
-
-    response = requests.get(base_url, params=params, timeout=10)
-    response.raise_for_status()
-    return response.json()
-
-def set_weather_code():
-    api_key = os.getenv("OPENWEATHER_API_KEY")
-    if not api_key:
-        # Missing OPENWEATHER_API_KEY environment variable
-        now_ts = int(datetime.datetime.now().timestamp())
-        return {
-            "weather": "unknown",
-            "sunrise": now_ts + 6 * 3600,
-            "sunset": now_ts + 18 * 3600,
-            "raw": {},
-        }
-
-    try:
-        weather_data = get_weather(api_key)
-
-        weather = weather_data["weather"][0]
-
-        weather_id = int(weather["id"])
-        description = weather["description"]
-
-        if DEBUG:
-            debug_log(f"Weather ID: {weather_id}")
-            debug_log(f"Description: {description}")
-
-    except (
-        requests.RequestException,
-        KeyError,
-        IndexError,
-        TypeError,
-        ValueError
-    ) as e:
-        debug_log(f"Weather fetch failed: {e}")
-        return "unknown"
-    
-    return {
-        "weather": WEATHER_CODES.get(weather_id, "unknown"),
-        "sunrise": weather_data["sys"]["sunrise"],
-        "sunset": weather_data["sys"]["sunset"],
-        "raw": weather_data,
-    }
-
-def normalize_weather(weather):
-    if DEBUG and DEBUG_WEATHER_OVERRIDE is not None:
-        debug_log(f"Overriding weather with ID {DEBUG_WEATHER_OVERRIDE}")
-        weather = DEBUG_WEATHER_OVERRIDE
-    return weather if weather != "unknown" else "clear"
 
 def optional_layer(path):
     """Return a layer path only when the file exists, otherwise skip it."""
@@ -170,6 +104,7 @@ def get_layer_paths(bucket, stars, season, holiday, weather, shade, layout="one_
         ])
 
     return layers
+
 
 def add_weather_overlay(image_path, weather_data, output_path):
     """Simple top-monitor text overlay. Safe no-op if Pillow is unavailable."""
@@ -282,22 +217,28 @@ def set_wallpaper(path):
     ctypes.windll.user32.SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, path, 3)
 # ~~~~~ END FUNCTIONS ~~~~~
 
+
 # ~~~~~ MAIN ~~~~~
 def main():
 
-    weather_info = set_weather_code()
+    weather_state = get_weather_state(LAT, LON, UNITS)
 
-    weather = normalize_weather(weather_info["weather"])
+    if DEBUG and DEBUG_WEATHER_OVERRIDE is not None:
+        debug_log(f"Overriding weather with ID {DEBUG_WEATHER_OVERRIDE}")
+        weather = DEBUG_WEATHER_OVERRIDE
+    else:
+        weather = normalize_weather(weather_state["weather"])
 
-    sunrise = datetime.datetime.fromtimestamp(weather_info["sunrise"])
-    sunset = datetime.datetime.fromtimestamp(weather_info["sunset"])
-  
+    sunrise = datetime.datetime.fromtimestamp(weather_state["sunrise"])
+    sunset = datetime.datetime.fromtimestamp(weather_state["sunset"])
+
     now = datetime.datetime.now()
     if DEBUG_HOUR_OVERRIDE is not None:
         now = now.replace(hour=DEBUG_HOUR_OVERRIDE)
     year = now.year
     month = now.month
     day = now.day
+    hour = now.hour
 
     if DEBUG and DEBUG_SEASON_OVERRIDE is not None:
         debug_log(f"Overriding season for month {month}")
@@ -312,16 +253,12 @@ def main():
     else:
         holiday = get_holiday(day, month, year)
 
-    hour = now.hour
-
     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
         debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
         bucket = DEBUG_TIME_OVERRIDE
     else:
         bucket = get_time_bucket_by_sun(now, sunrise, sunset)
-
     star_bucket = get_star_bucket(bucket)
-
     shade = get_shade_by_bucket(bucket)
 
     if DEBUG:
@@ -365,7 +302,7 @@ def main():
         if top_monitor_config.get("show_weather_overlay", False):
             top_wallpaper = add_weather_overlay(
                 top_wallpaper,
-                weather_info.get("raw", {}),
+                weather_state.get("raw", {}),
                 top_overlay_output_path,
             )
 
@@ -377,13 +314,11 @@ def main():
 
     if DEBUG:
         debug_log(f"Hour: {hour}")
-        #debug_log(f"Bucket: {bucket}")
         debug_log(f"Stars: {star_bucket}")
         debug_log(f"Season: {season}")
         debug_log(f"Holiday: {holiday}")
         debug_log(f"Weather: {weather}")
         debug_log(f"Shade: {shade}")
-        #debug_log(f"Wallpaper: {str(final_wallpaper)}")
 
     if config.get("top_monitor", {}).get("enabled", False):
         if DEBUG:
