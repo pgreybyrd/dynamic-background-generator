@@ -32,7 +32,7 @@ OUTPUT_DIR = BASE_DIR / "output"
 DEBUG_HOUR_OVERRIDE = None # int from 0-23, or None to disable 
 DEBUG_TIME_OVERRIDE = None # time of day like 'dawn', 'noon', 'dusk', etc., or None to disable
 DEBUG_WEATHER_OVERRIDE = None # weather code like 'clear', 'rain', 'snow', etc., or None to disable
-DEBUG_SEASON_OVERRIDE = None # 'spring', 'summer', 'autumn', 'winter', or None to disable
+DEBUG_SEASON_OVERRIDE = None # 'early_spring', 'mid_summer', 'late_autumn', 'mid_winter', etc., or None to disable
 DEBUG_HOLIDAY_OVERRIDE = None # 'valentines', 'halloween', 'thanksgiving', 'christmas_eve', 'christmas_day', etc., or None to disable
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -92,7 +92,7 @@ def get_layer_paths(bucket, stars, season, holiday, weather, shade, layout="one_
         ])
 
     else:
-        season_path = ASSETS_DIR / "seasons" / layout / f"{season}.png"
+        season_path = ASSETS_DIR / "season" / layout / f"{season}.png"
         holiday_path = ASSETS_DIR / "holiday" / layout / f"{holiday}.png" if holiday != "none" else None
         shade_path = ASSETS_DIR / "shade" / layout / f"{shade}.png" if shade != "none" else None
         holiday_lights_path = ASSETS_DIR / "holiday_lights" / layout / f"{holiday}.png" if holiday != "none" else None

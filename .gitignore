@@ -9,6 +9,7 @@ assets/_helpers/
 assets/_references
 assets/_templates
 output/
+screenshots/
 config.json
 state.json
 debug_log.txt

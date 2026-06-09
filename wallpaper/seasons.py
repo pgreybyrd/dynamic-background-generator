@@ -1,15 +1,4 @@
-# Get the season
-# def get_season(month, debug=False, debug_season_override=None):
-#     if debug and debug_season_override is not None:
-#         return debug_season_override
-#     if month in (3, 4, 5):
-#         return "spring"
-#     if month in (6, 7, 8):
-#         return "summer"
-#     if month in (9, 10, 11):
-#         return "autumn"
-#     return "winter"
-
+# Get the season based on the month. This assumes season PNG filenames match these names.
 def get_season(month):
     if month == 3:
         return "early_spring"
