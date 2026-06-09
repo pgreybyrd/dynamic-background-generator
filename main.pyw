@@ -1,6 +1,7 @@
 # ~~~~~ IMPORTS ~~~~~
 import ctypes
 import datetime
+from multiprocessing.util import debug
 import requests
 import os
 import json
@@ -17,8 +18,6 @@ except ImportError:
 from pathlib import Path 
 from weather_codes import WEATHER_CODES
 from image_composer import compose_wallpaper
-
-
 # ~~~~~ END IMPORTS ~~~~~
 
 # ~~~~~ CONSTANTS ~~~~~
@@ -46,9 +45,9 @@ LAT = config["lat"]
 LON = config["lon"]
 
 UNITS = config["units"]  
+# ~~~~~ END CONSTANTS ~~~~~
 
-#from wallpaper.holidays import calculate_easter, second_sunday_of_may, third_sunday_of_june, fourth_thursday_of_november, get_holiday
-#from wallpaper.time_buckets import get_time_bucket_by_sun
+# ~~~~~ FUNCTIONS ~~~~~
 from wallpaper.logging import debug_log as _debug_log
 
 def debug_log(message):
@@ -62,114 +61,10 @@ def load_state():
 def save_state(state):
     _save_state(state, STATE_PATH)  
 
-# ~~~~~ END CONSTANTS ~~~~~
-
-# ~~~~~ FUNCTIONS ~~~~~
-
-        
-
+from wallpaper.time_buckets import get_time_bucket_by_sun as _get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
 
 def get_time_bucket_by_sun(now, sunrise, sunset):
-    if DEBUG and DEBUG_TIME_OVERRIDE is not None:
-        debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
-        return DEBUG_TIME_OVERRIDE
-
-    minutes_from_sunrise = int((now - sunrise).total_seconds() / 60)
-    minutes_from_sunset = int((now - sunset).total_seconds() / 60)
-
-    sunrise_buckets = [
-        (-60, "sunrise_-60"),
-        (-45, "sunrise_-45"),
-        (-30, "sunrise_-30"),
-        (-15, "sunrise_-15"),
-        (0, "sunrise_0"),
-        (15, "sunrise_15"),
-        (30, "sunrise_30"),
-        (45, "sunrise_45"),
-    ]
-
-    sunset_buckets = [
-        (-90, "golden_early"),
-        (-60, "sunset_-60"),
-        (-45, "sunset_-45"),
-        (-30, "sunset_-30"),
-        (-15, "sunset_-15"),
-        (0, "sunset_0"),
-        (15, "sunset_15"),
-        (30, "sunset_30"),
-        (45, "sunset_45"),
-        (60, "sunset_60"),
-        (90, "blue_hour"),
-        (120, "dusk"),
-        (150, "deep_twilight"),
-    ]
-
-    # Sunrise window: 60 min before to 45 min after
-    if -60 <= minutes_from_sunrise < 60:
-        return closest_bucket(minutes_from_sunrise, sunrise_buckets)
-
-    # Sunset window: 90 min before to 150 min after
-    if -90 <= minutes_from_sunset < 150:
-        return closest_bucket(minutes_from_sunset, sunset_buckets)
-
-    # Before sunrise
-    if now < sunrise:
-        if minutes_from_sunrise < -180:
-            return "deep_night"
-        if minutes_from_sunrise < -120:
-            return "night"
-        return "pre_dawn"
-
-    # After sunrise, before sunset
-    daylight_start = sunrise + datetime.timedelta(minutes=60)
-    daylight_end = sunset - datetime.timedelta(minutes=90)
-
-    if daylight_start <= now < daylight_end:
-        daytime_buckets = [
-            "early_morning",
-            "mid_morning",
-            "late_morning",
-            "noon",
-            "early_afternoon",
-            "mid_afternoon",
-            "late_afternoon",
-        ]
-
-        total_seconds = max(1, (daylight_end - daylight_start).total_seconds())
-        elapsed_seconds = (now - daylight_start).total_seconds()
-
-        index = int((elapsed_seconds / total_seconds) * len(daytime_buckets))
-        index = max(0, min(index, len(daytime_buckets) - 1))
-
-        return daytime_buckets[index]
-
-    return "night"
-
-
-def closest_bucket(minutes, schedule):
-    closest = min(schedule, key=lambda item: abs(minutes - item[0]))
-    return closest[1]
-
-# Get the shade layer based on the sky bucket.
-# This assumes shade PNG filenames match these bucket names.
-# If you do not have a matching shade file yet, map that bucket to the closest existing one.
-def get_shade_by_bucket(bucket):
-    shade_by_bucket = {
-        "sunset_start": "sunset",
-        "sunset_peak": "sunset",
-        "afterglow": "dusk",
-        "dusk": "dusk",
-        "deep_dusk": "twilight",
-        "twilight": "twilight",
-        "deep_twilight": "night",
-        "night": "night",
-        "midnight": "night",
-        "pre_dawn": "twilight",
-        "dawn": "dusk",
-        "sunrise": "sunset",
-    }
-
-    return shade_by_bucket.get(bucket, "none")
+    return _get_time_bucket_by_sun(now, sunrise, sunset, debug=DEBUG, debug_time_override=DEBUG_TIME_OVERRIDE)
 
 # Get the season
 def get_season(month):
@@ -398,48 +293,6 @@ def normalize_weather(weather):
         weather = DEBUG_WEATHER_OVERRIDE
     return weather if weather != "unknown" else "clear"
 
-def get_star_bucket(bucket):
-    """Return the star overlay filename stem for the current sky bucket."""
-    star_by_bucket = {
-        "deep_night": "stars_100",
-        "night": "stars_100",
-
-        "deep_twilight": "stars_75",
-        "dusk": "stars_50",
-        "pre_dawn": "stars_50",
-
-        "sunrise_-60": "stars_50",
-        "sunrise_-45": "stars_25",
-        "sunrise_-30": "stars_10",
-        "sunrise_-15": "stars_0",
-        "sunrise_0": "stars_0",
-        "sunrise_15": "stars_0",
-        "sunrise_30": "stars_0",
-        "sunrise_45": "stars_0",
-
-        "early_morning": "stars_0",
-        "mid_morning": "stars_0",
-        "late_morning": "stars_0",
-        "noon": "stars_0",
-        "early_afternoon": "stars_0",
-        "mid_afternoon": "stars_0",
-        "late_afternoon": "stars_0",
-        "golden_early": "stars_0",
-
-        "sunset_-60": "stars_0",
-        "sunset_-45": "stars_0",
-        "sunset_-30": "stars_0",
-        "sunset_-15": "stars_0",
-        "sunset_0": "stars_0",
-        "sunset_15": "stars_10",
-        "sunset_30": "stars_25",
-        "sunset_45": "stars_50",
-        "sunset_60": "stars_75",
-        "blue_hour": "stars_75",
-    }
-    return star_by_bucket.get(bucket, "stars_0")
-
-
 def optional_layer(path):
     """Return a layer path only when the file exists, otherwise skip it."""
     return path if path and path.exists() else None
@@ -615,6 +468,8 @@ def main():
 
     hour = now.hour
 
+    if DEBUG and DEBUG_TIME_OVERRIDE is not None:
+        debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
     bucket = get_time_bucket_by_sun(now, sunrise, sunset)
 
     star_bucket = get_star_bucket(bucket)
