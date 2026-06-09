@@ -1,4 +1,5 @@
 # ~~~~~ IMPORTS ~~~~~
+from calendar import month
 import ctypes
 import datetime
 from multiprocessing.util import debug
@@ -43,7 +44,6 @@ DEBUG = config.get("debug", False)
 
 LAT = config["lat"]
 LON = config["lon"]
-
 UNITS = config["units"]  
 # ~~~~~ END CONSTANTS ~~~~~
 
@@ -61,167 +61,11 @@ def load_state():
 def save_state(state):
     _save_state(state, STATE_PATH)  
 
-from wallpaper.time_buckets import get_time_bucket_by_sun as _get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
+from wallpaper.time_buckets import get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
 
-def get_time_bucket_by_sun(now, sunrise, sunset):
-    return _get_time_bucket_by_sun(now, sunrise, sunset, debug=DEBUG, debug_time_override=DEBUG_TIME_OVERRIDE)
+from wallpaper.seasons import get_season
 
-from wallpaper.seasons import get_season as _get_season
-
-def get_season(month):
-    return _get_season(month, debug=DEBUG, debug_season_override=DEBUG_SEASON_OVERRIDE)
-
-# Calculate the holidays that aren't on a set date each year
-def calculate_easter(year):
-    # Anonymous Gregorian algorithm (Computus)
-    a = year % 19
-    b = year // 100
-    c = year % 100
-    d = b // 4
-    e = b % 4
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i = c // 4
-    k = c % 4
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month = (h + l - 7 * m + 114) // 31
-    day = ((h + l - 7 * m + 114) % 31) + 1
-    return datetime.date(year, month, day)
-
-def second_sunday_of_may(year):
-    # Start with the first day of May
-    first_of_may = datetime.date(year, 5, 1)
-    
-    # Find the day of the week for May 1st (0 is Monday, 6 is Sunday)
-    day_of_week = first_of_may.weekday()
-    
-    # Calculate how many days to add to get to the first Sunday
-    days_until_first_sunday = (6 - day_of_week) % 7
-    
-    # Calculate the date of the first Sunday
-    first_sunday = first_of_may + datetime.timedelta(days=days_until_first_sunday)
-    
-    # The second Sunday will be exactly one week after the first Sunday
-    second_sunday = first_sunday + datetime.timedelta(days=7)
-    
-    # Return just the day of the month
-    return second_sunday.day
-
-def third_sunday_of_june(year):
-    # Start with the first day of May
-    first_of_june = datetime.date(year, 6, 1)
-    
-    # Find the day of the week for May 1st (0 is Monday, 6 is Sunday)
-    day_of_week = first_of_june.weekday()
-    
-    # Calculate how many days to add to get to the first Sunday
-    days_until_first_sunday = (6 - day_of_week) % 7
-    
-    # Calculate the date of the first Sunday
-    first_sunday = first_of_june + datetime.timedelta(days=days_until_first_sunday)
-    
-    # The second Sunday will be exactly one week after the first Sunday
-    third_sunday = first_sunday + datetime.timedelta(days=14)
-    
-    # Return just the day of the month
-    return third_sunday.day
-
-def fourth_thursday_of_november(year):
-    # Start with the first day of November
-    first_of_november = datetime.date(year, 11, 1)
-    
-    # Find the day of the week for November 1st (0 is Monday, 6 is Sunday)
-    day_of_week = first_of_november.weekday()
-    
-    # Calculate how many days to add to get to the first Thursday
-    # If November 1st is a Thursday (day_of_week == 3), we need to add 0 days, otherwise,
-    # we add the necessary days to reach the upcoming Thursday
-    days_until_first_thursday = (3 - day_of_week) % 7
-    
-    # Calculate the date of the first Thursday
-    first_thursday = first_of_november + datetime.timedelta(days=days_until_first_thursday)
-    
-    # The fourth Thursday will be exactly three weeks after the first Thursday
-    fourth_thursday = first_thursday + datetime.timedelta(days=21)
-    
-    # Return just the day of the month
-    return fourth_thursday.day
-
-def get_holiday(day, month, year):
-    # Debug override
-    if DEBUG and DEBUG_HOLIDAY_OVERRIDE:
-        debug_log(f"Overriding holiday for {day}-{month}-{year}")
-        return DEBUG_HOLIDAY_OVERRIDE
-    # Easter
-    easter_date = calculate_easter(year)
-    if month == easter_date.month and day == easter_date.day:
-        return 'easter'       
-    # January
-    if month == 1:
-        # New Year's Day
-        if day == 1:
-            return 'new_years_day'
-    # February
-    if month == 2:
-        # Valentine's Day
-        if day == 14:
-            return 'valentines'
-    # March
-    if month == 3:
-        # St. Patrick's Day
-        if day == 17:
-            return 'st_patricks_day'
-    # April
-    if month == 4:
-        # April Fool's Day
-        if day == 1:
-            return 'april_fools'
-    # May
-    if month == 5:
-        # 2nd Sunday (Mother's Day)
-        if day == second_sunday_of_may(year):
-            return 'mothers_day'
-        # Cinco de Mayo
-        if day == 5:
-            return 'cinco_de_mayo'        
-    # June
-    if month == 6:
-        # 3rd Sunday (Father's Day)
-        if day == third_sunday_of_june(year):
-            return 'fathers_day'  
-        # Juneteenth
-        if day == 19:
-            return 'juneteenth'   
-    # July
-    if month == 7:
-        # Fourth of July (Independence Day)
-        if day == 4:
-            return 'fourth_of_july'
-    # August
-    # September
-    # October
-    if month == 10:
-        if day == 31:
-            return 'halloween'
-    # November
-    if month == 11:
-        # Dia de los Muertos
-        if day == 1:
-            return 'dia_de_los_muertos'
-        # Thanksgiving
-        if day == fourth_thursday_of_november(year):
-            return 'thanksgiving'
-    # December
-    if month == 12:
-        if day == 24:
-            return 'christmas_eve'
-        if day == 25:
-            return 'christmas_day'
-        if day == 31:
-            return 'new_years_eve'   
-    return 'none'
+from wallpaper.holidays import get_holiday
 
 # Weather layer
 def get_weather(api_key):
@@ -455,15 +299,26 @@ def main():
     month = now.month
     day = now.day
 
-    season = get_season(month)
+    if DEBUG and DEBUG_SEASON_OVERRIDE is not None:
+        debug_log(f"Overriding season for month {month}")
+        season = DEBUG_SEASON_OVERRIDE
+    else:   
+        season = get_season(month)
 
-    holiday = get_holiday(day, month, year)
+    # Debug override
+    if DEBUG and DEBUG_HOLIDAY_OVERRIDE is not None:
+        debug_log(f"Overriding holiday for {day}-{month}-{year}")
+        holiday = DEBUG_HOLIDAY_OVERRIDE
+    else:
+        holiday = get_holiday(day, month, year)
 
     hour = now.hour
 
     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
         debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
-    bucket = get_time_bucket_by_sun(now, sunrise, sunset)
+        bucket = DEBUG_TIME_OVERRIDE
+    else:
+        bucket = get_time_bucket_by_sun(now, sunrise, sunset)
 
     star_bucket = get_star_bucket(bucket)
 
