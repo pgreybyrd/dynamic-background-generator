@@ -3,6 +3,7 @@ import datetime
 def get_time_bucket_by_sun(now, sunrise, sunset):
     minutes_from_sunrise = int((now - sunrise).total_seconds() / 60)
     minutes_from_sunset = int((now - sunset).total_seconds() / 60)
+    #return minutes_from_sunset
 
     sunrise_buckets = [
         (-60, "sunrise_-60"),
@@ -22,21 +23,21 @@ def get_time_bucket_by_sun(now, sunrise, sunset):
         (-30, "sunset_-30"),
         (-15, "sunset_-15"),
         (0, "sunset_0"),
-        (15, "sunset_15"),
-        (30, "sunset_30"),
-        (45, "sunset_45"),
-        (60, "sunset_60"),
-        (75, "blue_hour"),
-        (100, "dusk"),
-        (140, "deep_twilight"),
+        (10, "sunset_15"),
+        (20, "sunset_30"),
+        (30, "sunset_45"),
+        (40, "sunset_60"),
+        (50, "blue_hour"),
+        (60, "dusk"),
+        (70, "deep_twilight"),
     ]
 
     # Sunrise window: 60 min before to 60 min after
-    if -60 <= minutes_from_sunrise < 60:
+    if -60 <= minutes_from_sunrise < 140:
         return closest_bucket(minutes_from_sunrise, sunrise_buckets)
 
     # Sunset window: 60 min before to 60 min after
-    if -60 <= minutes_from_sunset < 60:
+    if -90 <= minutes_from_sunset < 45:
         return closest_bucket(minutes_from_sunset, sunset_buckets)
 
     # Before sunrise
@@ -159,3 +160,42 @@ def get_star_bucket(bucket):
         "deep_night": "stars_100",   
     }
     return star_by_bucket.get(bucket, "stars_0")
+
+def get_moon_bucket(bucket):
+    moon_by_bucket = {
+        "pre_dawn": "moon_100",
+
+        "sunrise_-60": "moon_75",
+        "sunrise_-45": "moon_50",
+        "sunrise_-30": "moon_25",
+        "sunrise_-15": "moon_10",
+        "sunrise_0": "moon_0",
+
+        "early_morning": "moon_0",
+        "mid_morning": "moon_0",
+        "late_morning": "moon_0",
+        "noon": "moon_0",
+        "early_afternoon": "moon_0",
+        "mid_afternoon": "moon_0",
+        "late_afternoon": "moon_0",
+
+        "golden_early": "moon_0",
+        "sunset_-60": "moon_0",
+        "sunset_-45": "moon_10",
+        "sunset_-30": "moon_25",
+        "sunset_-15": "moon_50",
+        "sunset_0": "moon_75",
+
+        "sunset_15": "moon_100",
+        "sunset_30": "moon_100",
+        "sunset_45": "moon_100",
+        "sunset_60": "moon_100",
+
+        "blue_hour": "moon_100",
+        "dusk": "moon_100",
+        "deep_twilight": "moon_100",
+        "night": "moon_100",
+        "deep_night": "moon_100",
+    }
+
+    return moon_by_bucket.get(bucket, "moon_0")

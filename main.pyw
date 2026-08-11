@@ -1,18 +1,7 @@
 # ~~~~~ IMPORTS ~~~~~
-from calendar import month
-import ctypes
 import datetime
 from multiprocessing.util import debug
 import json
-
-try:
-    import comtypes
-    import comtypes.client
-    from comtypes import GUID, COMMETHOD, HRESULT
-    from ctypes import POINTER, c_uint
-    from ctypes.wintypes import LPWSTR, RECT
-except ImportError:
-    comtypes = None
 
 from pathlib import Path 
 # ~~~~~ END IMPORTS ~~~~~
@@ -58,7 +47,9 @@ def save_state(state):
     _save_state(state, STATE_PATH)  
 
 from wallpaper.image_composer import compose_wallpaper
-from wallpaper.time_buckets import get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
+from wallpaper.time_buckets import get_moon_bucket, get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
+from wallpaper.moon import get_moon_global_position
+from wallpaper.image_composer import add_floating_image
 from wallpaper.seasons import get_season
 from wallpaper.holidays import get_holiday
 from wallpaper.weather import get_weather_state, normalize_weather
@@ -83,7 +74,7 @@ def main():
     sunset = datetime.datetime.fromtimestamp(weather_state["sunset"])
 
     now = datetime.datetime.now()
-    if DEBUG_HOUR_OVERRIDE is not None:
+    if DEBUG and DEBUG_HOUR_OVERRIDE is not None:
         now = now.replace(hour=DEBUG_HOUR_OVERRIDE)
     year = now.year
     month = now.month
@@ -109,12 +100,14 @@ def main():
     else:
         bucket = get_time_bucket_by_sun(now, sunrise, sunset)
     star_bucket = get_star_bucket(bucket)
+    moon_bucket = get_moon_bucket(bucket)
     shade = get_shade_by_bucket(bucket)
 
     if DEBUG:
         debug_log(f"Now: {now}")
         debug_log(f"Sunrise: {sunrise}")
         debug_log(f"Sunset: {sunset}")
+        debug_log(f"Minutes after sunrise: {(now - sunrise).total_seconds() / 60:.1f}")
         debug_log(f"Minutes after sunset: {(now - sunset).total_seconds() / 60:.1f}")
         debug_log(f"Bucket: {bucket}")
 
@@ -143,8 +136,8 @@ def main():
         top_output_path = OUTPUT_DIR / "current_wallpaper_top.png"
         top_overlay_output_path = OUTPUT_DIR / "current_wallpaper_top_overlay.png"
 
-        bottom_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "horizontal")
-        top_layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "vertical")
+        bottom_layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "horizontal")
+        top_layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "vertical")
 
         bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
         top_wallpaper = compose_wallpaper(top_layers, top_output_path)
@@ -159,12 +152,13 @@ def main():
         final_wallpaper = bottom_wallpaper
     else:
         output_path = OUTPUT_DIR / "current_wallpaper.png"
-        layers = get_layer_paths(bucket, star_bucket, season, holiday, weather, shade, ASSETS_DIR, "one_monitor")
+        layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "one_monitor")
         final_wallpaper = compose_wallpaper(layers, output_path)
 
     if DEBUG:
         debug_log(f"Hour: {hour}")
         debug_log(f"Stars: {star_bucket}")
+        debug_log(f"Moon: {moon_bucket}")
         debug_log(f"Season: {season}")
         debug_log(f"Holiday: {holiday}")
         debug_log(f"Weather: {weather}")
