@@ -1,5 +1,7 @@
 import ctypes
 
+from wallpaper.logging import debug_log
+
 try:
     import comtypes
     import comtypes.client
@@ -43,28 +45,69 @@ def get_desktop_wallpaper_object():
 def debug_monitor_ids():
     wallpaper = get_desktop_wallpaper_object()
     count = wallpaper.GetMonitorDevicePathCount()
-    #debug_log(f"Detected {count} monitor(s).")
+    debug_log(f"Detected {count} monitor(s).")
+
     for i in range(count):
         monitor_id = wallpaper.GetMonitorDevicePathAt(i)
         rect = wallpaper.GetMonitorRECT(monitor_id)
-        #debug_log(f"Monitor {i}: {monitor_id} rect={rect}")
+        debug_log(f"Monitor {i}: {monitor_id} rect={rect}")
 
 
-def set_wallpapers_per_monitor(bottom_path, top_path, top_monitor_index):
+def set_wallpapers_per_monitor(
+    bottom_path,
+    top_path,
+    top_monitor_index,
+    update_bottom=True,
+    update_top=True,
+):
     wallpaper = get_desktop_wallpaper_object()
     count = wallpaper.GetMonitorDevicePathCount()
 
     if top_monitor_index is None or top_monitor_index < 0 or top_monitor_index >= count:
-        # debug_log(
-        #     f"Invalid top_monitor.monitor_index={top_monitor_index}; "
-        #     f"expected 0 through {count - 1}. Falling back to single wallpaper."
-        # )
-        set_wallpaper(bottom_path)
+        debug_log(
+            f"Invalid top_monitor.monitor_index={top_monitor_index}; "
+            f"expected 0 through {count - 1}."
+        )
+
+        if update_bottom and bottom_path:
+            debug_log("Falling back to single wallpaper for horizontal update.")
+            set_wallpaper(bottom_path)
+            return
+
+        raise RuntimeError(
+            "Cannot safely apply a vertical-only wallpaper update because "
+            "top_monitor.monitor_index is invalid."
+        )
+
+    top_monitor_id = wallpaper.GetMonitorDevicePathAt(top_monitor_index)
+
+    if update_bottom and update_top:
+        if not bottom_path or not top_path:
+            raise ValueError("Both wallpaper paths are required when both groups update.")
+
+        # Fast path from Pass 1: one shared refresh, then restore the vertical monitor.
+        wallpaper.SetWallpaper(None, bottom_path)
+        wallpaper.SetWallpaper(top_monitor_id, top_path)
         return
 
-    for i in range(count):
-        monitor_id = wallpaper.GetMonitorDevicePathAt(i)
-        wallpaper.SetWallpaper(monitor_id, top_path if i == top_monitor_index else bottom_path)
+    if update_bottom:
+        if not bottom_path:
+            raise ValueError("bottom_path is required for a horizontal wallpaper update.")
+
+        # Do NOT use SetWallpaper(None, ...) here: that would also refresh the
+        # vertical monitor and defeat independent group updates.
+        for i in range(count):
+            if i == top_monitor_index:
+                continue
+
+            monitor_id = wallpaper.GetMonitorDevicePathAt(i)
+            wallpaper.SetWallpaper(monitor_id, bottom_path)
+
+    if update_top:
+        if not top_path:
+            raise ValueError("top_path is required for a vertical wallpaper update.")
+
+        wallpaper.SetWallpaper(top_monitor_id, top_path)
 
 
 def set_wallpaper(path):

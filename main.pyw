@@ -56,6 +56,26 @@ from wallpaper.weather import get_weather_state, normalize_weather
 from wallpaper.overlay import add_weather_overlay
 from wallpaper.assets import get_layer_paths
 from wallpaper.monitors import set_wallpaper, set_wallpapers_per_monitor, debug_monitor_ids
+
+
+def layer_fingerprint(layer_paths):
+    """Serializable fingerprint of the actual artwork inputs for one monitor group."""
+    return [str(path) for path in layer_paths]
+
+
+def weather_overlay_fingerprint(weather_data):
+    """Match exactly what add_weather_overlay() currently renders."""
+    temp = weather_data.get("main", {}).get("temp")
+    description = weather_data.get("weather", [{}])[0].get("description", "").title()
+
+    return {
+        "temp": round(temp) if temp is not None else None,
+        "description": description,
+    }
+
+
+def next_output_slot(previous_slot):
+    return "b" if previous_slot == "a" else "a"
 # ~~~~~ END FUNCTIONS ~~~~~
 
 
@@ -111,49 +131,149 @@ def main():
         debug_log(f"Minutes after sunset: {(now - sunset).total_seconds() / 60:.1f}")
         debug_log(f"Bucket: {bucket}")
 
-    current_state = {
-        "weather": weather,
-        "bucket": bucket,
-        "season": season,
-        "holiday": holiday,
-        "shade": shade
-    }
-
     previous_state = load_state()
-
-    if current_state == previous_state:
-        if DEBUG:
-            debug_log("No wallpaper update needed.")
-        return
-
-    save_state(current_state)
 
     top_monitor_config = config.get("top_monitor", {})
     top_monitor_enabled = bool(top_monitor_config.get("enabled", False))
 
     if top_monitor_enabled:
-        bottom_output_path = OUTPUT_DIR / "current_wallpaper_bottom.png"
-        top_output_path = OUTPUT_DIR / "current_wallpaper_top.png"
-        top_overlay_output_path = OUTPUT_DIR / "current_wallpaper_top_overlay.png"
+        # Resolve the actual layers first. This lets horizontal and vertical
+        # artwork change independently even when the semantic weather/time state changes.
+        bottom_layers = get_layer_paths(
+            bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
+            ASSETS_DIR, "horizontal"
+        )
+        top_layers = get_layer_paths(
+            bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
+            ASSETS_DIR, "vertical"
+        )
 
-        bottom_layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "horizontal")
-        top_layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "vertical")
+        bottom_visual_state = {
+            "layers": layer_fingerprint(bottom_layers),
+        }
 
-        bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
-        top_wallpaper = compose_wallpaper(top_layers, top_output_path)
+        top_visual_state = {
+            "layers": layer_fingerprint(top_layers),
+        }
 
         if top_monitor_config.get("show_weather_overlay", False):
-            top_wallpaper = add_weather_overlay(
-                top_wallpaper,
-                weather_state.get("raw", {}),
-                top_overlay_output_path,
+            top_visual_state["weather_overlay"] = weather_overlay_fingerprint(
+                weather_state.get("raw", {})
             )
 
-        final_wallpaper = bottom_wallpaper
+        previous_bottom_visual_state = previous_state.get("_bottom_visual_state")
+        previous_top_visual_state = previous_state.get("_top_visual_state")
+
+        previous_legacy_slot = previous_state.get("_output_slot")
+        previous_bottom_slot = previous_state.get("_bottom_output_slot", previous_legacy_slot)
+        previous_top_slot = previous_state.get("_top_output_slot", previous_legacy_slot)
+
+        bottom_initialized = previous_bottom_slot in ("a", "b")
+        top_initialized = previous_top_slot in ("a", "b")
+
+        bottom_changed = (
+            bottom_visual_state != previous_bottom_visual_state
+            or not bottom_initialized
+        )
+        top_changed = (
+            top_visual_state != previous_top_visual_state
+            or not top_initialized
+        )
+
+        if not bottom_changed and not top_changed:
+            if DEBUG:
+                debug_log("No wallpaper update needed.")
+            return
+
+        bottom_wallpaper = None
+        top_wallpaper = None
+
+        bottom_slot = previous_bottom_slot
+        top_slot = previous_top_slot
+
+        if bottom_changed:
+            bottom_slot = next_output_slot(previous_bottom_slot)
+            bottom_output_path = OUTPUT_DIR / f"current_wallpaper_bottom_{bottom_slot}.png"
+            bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
+
+        if top_changed:
+            top_slot = next_output_slot(previous_top_slot)
+            top_output_path = OUTPUT_DIR / f"current_wallpaper_top_{top_slot}.png"
+            top_overlay_output_path = OUTPUT_DIR / f"current_wallpaper_top_overlay_{top_slot}.png"
+
+            top_wallpaper = compose_wallpaper(top_layers, top_output_path)
+
+            if top_monitor_config.get("show_weather_overlay", False):
+                top_wallpaper = add_weather_overlay(
+                    top_wallpaper,
+                    weather_state.get("raw", {}),
+                    top_overlay_output_path,
+                )
+
+        if DEBUG:
+            debug_log(
+                f"Wallpaper groups changed: horizontal={bottom_changed}, "
+                f"vertical={top_changed}"
+            )
+            try:
+                debug_monitor_ids()
+            except Exception as e:
+                debug_log(f"Could not read monitor IDs: {e}")
+
+        set_wallpapers_per_monitor(
+            bottom_path=str(bottom_wallpaper) if bottom_wallpaper is not None else None,
+            top_path=str(top_wallpaper) if top_wallpaper is not None else None,
+            top_monitor_index=top_monitor_config.get("monitor_index"),
+            update_bottom=bottom_changed,
+            update_top=top_changed,
+        )
+
+        # Only record a group's new fingerprint/slot after composition + Windows
+        # switching completed successfully. If anything fails, the next run retries.
+        new_state = dict(previous_state)
+        new_state["_bottom_visual_state"] = bottom_visual_state
+        new_state["_top_visual_state"] = top_visual_state
+        new_state["_bottom_output_slot"] = bottom_slot
+        new_state["_top_output_slot"] = top_slot
+
+        # Remove Pass-1 metadata after migration so one shared slot cannot
+        # accidentally become authoritative again.
+        new_state.pop("_output_slot", None)
+
+        save_state(new_state)
+
     else:
-        output_path = OUTPUT_DIR / "current_wallpaper.png"
-        layers = get_layer_paths(bucket, star_bucket, moon_bucket, season, holiday, weather, shade, ASSETS_DIR, "one_monitor")
+        # Single-monitor mode keeps the same optimization, using the resolved
+        # layer list as the visual fingerprint.
+        layers = get_layer_paths(
+            bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
+            ASSETS_DIR, "one_monitor"
+        )
+        visual_state = {"layers": layer_fingerprint(layers)}
+
+        previous_visual_state = previous_state.get("_single_visual_state")
+        previous_slot = previous_state.get(
+            "_single_output_slot",
+            previous_state.get("_output_slot")
+        )
+        initialized = previous_slot in ("a", "b")
+
+        if visual_state == previous_visual_state and initialized:
+            if DEBUG:
+                debug_log("No wallpaper update needed.")
+            return
+
+        output_slot = next_output_slot(previous_slot)
+        output_path = OUTPUT_DIR / f"current_wallpaper_{output_slot}.png"
         final_wallpaper = compose_wallpaper(layers, output_path)
+
+        set_wallpaper(str(final_wallpaper))
+
+        new_state = dict(previous_state)
+        new_state["_single_visual_state"] = visual_state
+        new_state["_single_output_slot"] = output_slot
+        new_state.pop("_output_slot", None)
+        save_state(new_state)
 
     if DEBUG:
         debug_log(f"Hour: {hour}")
@@ -163,21 +283,6 @@ def main():
         debug_log(f"Holiday: {holiday}")
         debug_log(f"Weather: {weather}")
         debug_log(f"Shade: {shade}")
-
-    if config.get("top_monitor", {}).get("enabled", False):
-        if DEBUG:
-            try:
-                debug_monitor_ids()
-            except Exception as e:
-                debug_log(f"Could not read monitor IDs: {e}")
-
-        set_wallpapers_per_monitor(
-            bottom_path=str(OUTPUT_DIR / "current_wallpaper_bottom.png"),
-            top_path=str(OUTPUT_DIR / "current_wallpaper_top_overlay.png" if config.get("top_monitor", {}).get("show_weather_overlay", False) else OUTPUT_DIR / "current_wallpaper_top.png"),
-            top_monitor_index=config.get("top_monitor", {}).get("monitor_index"),
-        )
-    else:
-        set_wallpaper(str(final_wallpaper))
 # ~~~~~ END MAIN ~~~~~
 
 if __name__ == "__main__":
