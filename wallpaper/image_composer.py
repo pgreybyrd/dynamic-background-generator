@@ -19,6 +19,7 @@ def add_floating_image(base_path, floating_path, output_path, position):
 
     return output_path
 
+
 def add_top_centered_image(base_path, floating_path, output_path):
     # Center a floating image across the top portion of whatever canvas it is on.
     base = Image.open(base_path)
@@ -37,16 +38,24 @@ def add_top_centered_image(base_path, floating_path, output_path):
         (x, y)
     )
 
-def split_panorama(path, output_dir):
+
+def split_panorama(path, output_dir, slot):
     img = Image.open(path).convert("RGBA")
 
     left = img.crop((0, 0, 1920, 1080))
     middle = img.crop((1920, 0, 3840, 1080))
     right = img.crop((3840, 0, 5760, 1080))
 
-    left.save(output_dir / "bottom_left.png")
-    middle.save(output_dir / "bottom_middle.png")
-    right.save(output_dir / "bottom_right.png")
+    left_path = output_dir / f"bottom_left_{slot}.png"
+    middle_path = output_dir / f"bottom_middle_{slot}.png"
+    right_path = output_dir / f"bottom_right_{slot}.png"
+
+    left.save(left_path)
+    middle.save(middle_path)
+    right.save(right_path)
+
+    return left_path, middle_path, right_path
+
 
 def compose_wallpaper(layer_paths, output_path, moon_path=None, moon_position=None):
     valid_layers = [Path(path) for path in layer_paths if path and Path(path).exists()]

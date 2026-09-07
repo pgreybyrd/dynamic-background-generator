@@ -11,6 +11,7 @@ try:
 except ImportError:
     comtypes = None
 
+
 class IDesktopWallpaper(comtypes.IUnknown if comtypes is not None else object):
     if comtypes is not None:
         _iid_ = GUID("{B92B56A9-8B55-4E14-9A89-0199BBB6F93B}")
@@ -57,52 +58,122 @@ def set_wallpapers_per_monitor(
     bottom_path,
     top_path,
     top_monitor_index,
+    bottom_mode="shared",
+    bottom_monitor_indices=None,
+    panorama_paths=None,
     update_bottom=True,
     update_top=True,
 ):
     wallpaper = get_desktop_wallpaper_object()
     count = wallpaper.GetMonitorDevicePathCount()
 
-    if top_monitor_index is None or top_monitor_index < 0 or top_monitor_index >= count:
-        debug_log(
-            f"Invalid top_monitor.monitor_index={top_monitor_index}; "
-            f"expected 0 through {count - 1}."
+    if bottom_monitor_indices is None:
+        bottom_monitor_indices = [
+            index
+            for index in range(count)
+            if index != top_monitor_index
+        ]
+
+    # Make sure every configured monitor actually exists.
+    for index in bottom_monitor_indices:
+        if index < 0 or index >= count:
+            raise ValueError(
+                f"Invalid bottom monitor index {index}; "
+                f"expected 0 through {count - 1}."
+            )
+        
+    if (
+        top_monitor_index is not None
+        and top_monitor_index in bottom_monitor_indices
+    ):
+        raise ValueError(
+            "top_monitor.monitor_index cannot also be in bottom_monitors.monitor_indices."
         )
 
-        if update_bottom and bottom_path:
-            debug_log("Falling back to single wallpaper for horizontal update.")
-            set_wallpaper(bottom_path)
-            return
+    if top_monitor_index is not None:
+        if top_monitor_index < 0 or top_monitor_index >= count:
+            raise ValueError(
+                f"Invalid top_monitor.monitor_index={top_monitor_index}; "
+                f"expected 0 through {count - 1}."
+            )
 
-        raise RuntimeError(
-            "Cannot safely apply a vertical-only wallpaper update because "
-            "top_monitor.monitor_index is invalid."
-        )
+    top_monitor_id = (
+        wallpaper.GetMonitorDevicePathAt(top_monitor_index)
+        if top_monitor_index is not None
+        else None
+    )
 
-    top_monitor_id = wallpaper.GetMonitorDevicePathAt(top_monitor_index)
-
-    if update_bottom and update_top:
-        if not bottom_path or not top_path:
-            raise ValueError("Both wallpaper paths are required when both groups update.")
-
-        wallpaper.SetWallpaper(None, bottom_path)
-        wallpaper.SetWallpaper(top_monitor_id, top_path)
-        return
+    # ----- Bottom monitor group -----
 
     if update_bottom:
-        if not bottom_path:
-            raise ValueError("bottom_path is required for a horizontal wallpaper update.")
+        if bottom_mode == "panorama":
+            if not panorama_paths:
+                raise ValueError(
+                    "panorama_paths are required when bottom_mode='panorama'."
+                )
 
-        for i in range(count):
-            if i == top_monitor_index:
-                continue
+            if len(panorama_paths) != len(bottom_monitor_indices):
+                raise ValueError(
+                    "The number of panorama slices must match the number "
+                    "of configured bottom monitors."
+                )
 
-            monitor_id = wallpaper.GetMonitorDevicePathAt(i)
-            wallpaper.SetWallpaper(monitor_id, bottom_path)
+            # Panorama monitor indices are configured in physical left-to-right order.
+            for index, wallpaper_path in zip(
+                bottom_monitor_indices,
+                panorama_paths,
+            ):
+                monitor_id = wallpaper.GetMonitorDevicePathAt(index)
+                wallpaper.SetWallpaper(
+                    monitor_id,
+                    str(wallpaper_path),
+                )
+
+        elif bottom_mode == "shared":
+            if not bottom_path:
+                raise ValueError(
+                    "bottom_path is required when bottom_mode='shared'."
+                )
+
+            # The fast shared-wallpaper shortcut is safe only when the bottom
+            # group contains every monitor except the configured top monitor.
+            non_top_indices = {
+                index
+                for index in range(count)
+                if index != top_monitor_index
+            }
+
+            configured_bottom_indices = set(bottom_monitor_indices)
+
+            if (
+                update_top
+                and top_monitor_id is not None
+                and configured_bottom_indices == non_top_indices
+            ):
+                wallpaper.SetWallpaper(None, bottom_path)
+
+            else:
+                for index in bottom_monitor_indices:
+                    monitor_id = wallpaper.GetMonitorDevicePathAt(index)
+                    wallpaper.SetWallpaper(monitor_id, bottom_path)
+
+        else:
+            raise ValueError(
+                f"Unknown bottom monitor mode: {bottom_mode}"
+            )
+
+    # ----- Top monitor -----
 
     if update_top:
+        if top_monitor_id is None:
+            raise ValueError(
+                "A top monitor index is required for a vertical wallpaper update."
+            )
+
         if not top_path:
-            raise ValueError("top_path is required for a vertical wallpaper update.")
+            raise ValueError(
+                "top_path is required for a vertical wallpaper update."
+            )
 
         wallpaper.SetWallpaper(top_monitor_id, top_path)
 

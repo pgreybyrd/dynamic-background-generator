@@ -27,6 +27,7 @@ def get_astronomical_boundaries(year):
         ).astimezone(LOCAL_TIMEZONE),
     }
 
+
 def split_season_into_thirds(now, start, end, season_name):
     # Divide one astronomical season into early, mid, and late.
     season_length = end - start
@@ -39,6 +40,7 @@ def split_season_into_thirds(now, start, end, season_name):
         return f"mid_{season_name}"
 
     return f"late_{season_name}"
+
 
 def get_season(now):
     boundaries = get_astronomical_boundaries(now.year)
@@ -86,6 +88,7 @@ def get_season(now):
     return split_season_into_thirds(
         now, previous_winter, spring, "winter"
     )
+
 
 def get_astronomical_event(now):
     boundaries = get_astronomical_boundaries(now.year)

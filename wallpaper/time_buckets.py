@@ -1,5 +1,6 @@
 import datetime
 
+
 def get_time_bucket_by_sun(now, sunrise, sunset):
     minutes_from_sunrise = int((now - sunrise).total_seconds() / 60)
     minutes_from_sunset = int((now - sunset).total_seconds() / 60)
@@ -73,9 +74,11 @@ def get_time_bucket_by_sun(now, sunrise, sunset):
 
     return "night"
 
+
 def closest_bucket(minutes, schedule):
     closest = min(schedule, key=lambda item: abs(minutes - item[0]))
     return closest[1]
+
 
 # Get the shade layer based on the sky bucket.
 # This assumes shade PNG filenames match these bucket names.
@@ -120,6 +123,7 @@ def get_shade_by_bucket(bucket):
     }
     return shade_by_bucket.get(bucket, "shade_0")
 
+
 def get_star_bucket(bucket):
     """Return the star overlay filename stem for the current sky bucket."""
     star_by_bucket = {
@@ -160,6 +164,7 @@ def get_star_bucket(bucket):
         "deep_night": "stars_100",   
     }
     return star_by_bucket.get(bucket, "stars_0")
+
 
 def get_moon_bucket(bucket):
     moon_by_bucket = {

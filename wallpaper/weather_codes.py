@@ -1,62 +1,152 @@
+# WMO weather codes used by Open-Meteo.
+# Rain, snow, and cloud coverage come from the actual current values.
+# These codes add context that those numbers cannot describe by themselves.
+
 WEATHER_CODES = {
-    200: "thunderstorm_light_rain",
-    201: "thunderstorm_rain",
-    202: "thunderstorm_heavy_rain",
-    210: "light_thunderstorm",
-    211: "thunderstorm",
-    212: "heavy_thunderstorm",
-    221: "ragged_thunderstorm",
-    230: "thunderstorm_light_drizzle",
-    231: "thunderstorm_drizzle",
-    232: "thunderstorm_heavy_drizzle",
+    # Clear / cloud conditions
+    0: {
+        "description": "Clear sky",
+        "cloud_type": "normal",
+    },
+    1: {
+        "description": "Mainly clear",
+        "cloud_type": "normal",
+    },
+    2: {
+        "description": "Partly cloudy",
+        "cloud_type": "normal",
+    },
+    3: {
+        "description": "Overcast",
+        "cloud_type": "normal",
+    },
 
-    300: "light_drizzle",
-    301: "drizzle",
-    302: "heavy_drizzle",
-    310: "light_drizzle_rain",
-    311: "drizzle_rain",
-    312: "heavy_drizzle_rain",
-    313: "shower_rain_drizzle",
-    314: "heavy_shower_rain_drizzle",
-    321: "shower_drizzle",
+    # Fog
+    45: {
+        "description": "Fog",
+        "cloud_type": "normal",
+        "atmosphere": "fog",
+    },
+    48: {
+        "description": "Rime fog",
+        "cloud_type": "normal",
+        "atmosphere": "fog",
+    },
 
-    500: "light_rain",
-    501: "moderate_rain",
-    502: "heavy_rain",
-    503: "very_heavy_rain", 
-    504: "extreme_rain",
-    511: "freezing_rain",
-    520: "light_shower_rain",
-    521: "shower_rain",
-    522: "heavy_shower_rain",
-    531: "ragged_shower_rain",
+    # Drizzle
+    51: {
+        "description": "Light drizzle",
+        "cloud_type": "normal",
+    },
+    53: {
+        "description": "Drizzle",
+        "cloud_type": "normal",
+    },
+    55: {
+        "description": "Heavy drizzle",
+        "cloud_type": "normal",
+    },
 
-    600: "light_snow",
-    601: "snow",
-    602: "heavy_snow",
-    611: "sleet",
-    612: "light_shower_sleet",
-    613: "shower_sleet",
-    615: "light_rain_snow",
-    616: "rain_snow",
-    620: "light_shower_snow",
-    621: "shower_snow",
-    622: "heavy_shower_snow",
+    # Freezing drizzle
+    # It can use the regular rain artwork while falling. Ice buildup can
+    # become a separate environment effect later.
+    56: {
+        "description": "Light freezing drizzle",
+        "cloud_type": "normal",
+        "freezing_precipitation": True,
+    },
+    57: {
+        "description": "Freezing drizzle",
+        "cloud_type": "normal",
+        "freezing_precipitation": True,
+    },
 
-    701: "mist",
-    711: "smoke",
-    721: "haze",
-    731: "dust",
-    741: "fog",
-    751: "sand",
-    761: "dust",
-    762: "volcanic_ash",
-    771: "squalls",
-    781: "tornado",
+    # Rain
+    61: {
+        "description": "Light rain",
+        "cloud_type": "normal",
+    },
+    63: {
+        "description": "Rain",
+        "cloud_type": "normal",
+    },
+    65: {
+        "description": "Heavy rain",
+        "cloud_type": "normal",
+    },
 
-    800: "clear",
-    801: "few_clouds",
-    802: "scattered_clouds",
-    803: "broken_clouds", 
-    804: "overcast_clouds",
+    # Freezing rain
+    66: {
+        "description": "Light freezing rain",
+        "cloud_type": "normal",
+        "freezing_precipitation": True,
+    },
+    67: {
+        "description": "Freezing rain",
+        "cloud_type": "normal",
+        "freezing_precipitation": True,
+    },
+
+    # Snow
+    71: {
+        "description": "Light snow",
+        "cloud_type": "normal",
+    },
+    73: {
+        "description": "Snow",
+        "cloud_type": "normal",
+    },
+    75: {
+        "description": "Heavy snow",
+        "cloud_type": "normal",
+    },
+    77: {
+        "description": "Snow grains",
+        "cloud_type": "normal",
+    },
+
+    # Rain showers
+    80: {
+        "description": "Light rain showers",
+        "cloud_type": "normal",
+    },
+    81: {
+        "description": "Rain showers",
+        "cloud_type": "normal",
+    },
+    82: {
+        "description": "Heavy rain showers",
+        "cloud_type": "normal",
+    },
+
+    # Snow showers
+    85: {
+        "description": "Light snow showers",
+        "cloud_type": "normal",
+    },
+    86: {
+        "description": "Heavy snow showers",
+        "cloud_type": "normal",
+    },
+
+    # Thunderstorms
+    # Cloud coverage still controls how much of the sky is covered. Storm type
+    # swaps in the darker thundercloud artwork, and this flag adds lightning.
+    95: {
+        "description": "Thunderstorm",
+        "cloud_type": "storm",
+        "thunderstorm": True,
+    },
+    96: {
+        "description": "Thunderstorm with hail",
+        "cloud_type": "storm",
+        "thunderstorm": True,
+        "hail": True,
+    },
+    99: {
+        "description": "Thunderstorm with heavy hail",
+        "cloud_type": "storm",
+        "thunderstorm": True,
+        "hail": True,
+    },
 }

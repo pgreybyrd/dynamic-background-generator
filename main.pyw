@@ -27,7 +27,7 @@ DEBUG_TIME_OVERRIDE = None # time of day like 'dawn', 'noon', 'dusk', etc., or N
 DEBUG_WEATHER_OVERRIDE = None # weather code like 'clear', 'rain', 'snow', etc., or None to disable
 DEBUG_SEASON_OVERRIDE = None # 'early_spring', 'mid_summer', 'late_autumn', 'mid_winter', etc., or None to disable
 DEBUG_HOLIDAY_OVERRIDE = None # 'valentines', 'halloween', 'thanksgiving', 'christmas_eve', 'christmas_day', etc., or None to disable
-DEBUG_ASTRONOMICAL_EVENT_OVERRIDE = None # 'autumn_equinox', 'spring_equinox', 'summer_solstice', 'winter_solstice', etc., or None to disable
+DEBUG_BANNER_OVERRIDE = None # 'autumn_equinox', 'happy_birthday','happy_halloween', etc., or None to disable
 
 # Configuration is intentionally outside the Python code so location,
 # monitor layout, update interval, etc. can change without touching the
@@ -58,13 +58,12 @@ def load_state():
 def save_state(state):
     _save_state(state, STATE_PATH)  
 
-from wallpaper.image_composer import compose_wallpaper, add_top_centered_image
+from wallpaper.image_composer import compose_wallpaper, add_top_centered_image, split_panorama, add_floating_image
 from wallpaper.time_buckets import get_moon_bucket, get_time_bucket_by_sun, get_shade_by_bucket, get_star_bucket
 from wallpaper.moon import get_moon_global_position
-from wallpaper.image_composer import add_floating_image
 from wallpaper.seasons import get_season, get_astronomical_event
-from wallpaper.holidays import get_holiday
-from wallpaper.weather import get_weather_state, normalize_weather
+from wallpaper.holidays import get_holiday, get_banner
+from wallpaper.weather import get_weather_state
 from wallpaper.overlay import add_weather_overlay
 from wallpaper.assets import get_layer_paths
 from wallpaper.monitors import set_wallpaper, set_wallpapers_per_monitor, debug_monitor_ids
@@ -107,14 +106,14 @@ def main():
     weather_state = get_weather_state(LAT, LON, UNITS)
 
     if DEBUG and DEBUG_WEATHER_OVERRIDE is not None:
-        debug_log(f"Overriding weather with ID {DEBUG_WEATHER_OVERRIDE}")
+        debug_log(f"Overriding weather with {DEBUG_WEATHER_OVERRIDE}")
         weather = DEBUG_WEATHER_OVERRIDE
     else:
-        weather = normalize_weather(weather_state["weather"])
+        weather = weather_state["weather"]
 
     # Use the real sunrise/sunset so "dawn" actually moves with the seasons.
-    sunrise = datetime.datetime.fromtimestamp(weather_state["sunrise"])
-    sunset = datetime.datetime.fromtimestamp(weather_state["sunset"])
+    sunrise = weather_state["sunrise"]
+    sunset = weather_state["sunset"]
 
     now = datetime.datetime.now()
     if DEBUG and DEBUG_HOUR_OVERRIDE is not None:
@@ -132,22 +131,22 @@ def main():
     else:
         season = get_season(now)
 
-    if DEBUG and DEBUG_ASTRONOMICAL_EVENT_OVERRIDE is not None:
-        debug_log(
-            f"Overriding astronomical event with "
-            f"{DEBUG_ASTRONOMICAL_EVENT_OVERRIDE}"
-        )
-        astronomical_event = DEBUG_ASTRONOMICAL_EVENT_OVERRIDE
-
-    debug_log(f"Season: {season}")
-    debug_log(f"Astronomical event: {astronomical_event}")
-
-    # Debug override
     if DEBUG and DEBUG_HOLIDAY_OVERRIDE is not None:
-        debug_log(f"Overriding holiday for {day}-{month}-{year}")
+        debug_log(f"Overriding holiday with {DEBUG_HOLIDAY_OVERRIDE}")
         holiday = DEBUG_HOLIDAY_OVERRIDE
     else:
         holiday = get_holiday(day, month, year)
+
+    banner = get_banner(holiday, astronomical_event)
+
+    if DEBUG and DEBUG_BANNER_OVERRIDE is not None:
+        debug_log(f"Overriding banner with {DEBUG_BANNER_OVERRIDE}")
+        banner = DEBUG_BANNER_OVERRIDE
+
+    debug_log(f"Season: {season}")
+    debug_log(f"Holiday: {holiday}")
+    debug_log(f"Astronomical event: {astronomical_event}")
+    debug_log(f"Banner: {banner}")
 
     if DEBUG and DEBUG_TIME_OVERRIDE is not None:
         debug_log(f"Overriding time of day to {DEBUG_TIME_OVERRIDE}")
@@ -173,33 +172,46 @@ def main():
     top_monitor_enabled = bool(top_monitor_config.get("enabled", False))
 
     if top_monitor_enabled:
-        # Resolve the actual layers first. This lets horizontal and vertical
-        # artwork change independently.
+
+        bottom_config = config.get("bottom_monitors", {})
+        bottom_mode = bottom_config.get("mode", "shared")
+        bottom_monitor_indices = bottom_config.get("monitor_indices")
+
+        bottom_layout = "panorama" if bottom_mode == "panorama" else "horizontal"
+
         bottom_assets = get_layer_paths(
-            bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
-            astronomical_event, ASSETS_DIR, "horizontal"
+            bucket,
+            star_bucket,
+            moon_bucket,
+            season,
+            holiday,
+            weather,
+            shade,
+            banner,
+            ASSETS_DIR,
+            bottom_layout,
         )
 
         bottom_layers = bottom_assets["layers"]
-        bottom_event = bottom_assets["astronomical_event"]
+        bottom_banner = bottom_assets["banner"]
         
         top_assets = get_layer_paths(
             bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
-            astronomical_event, ASSETS_DIR, "vertical"
+            banner, ASSETS_DIR, "vertical"
         )
 
         top_layers = top_assets["layers"]
-        top_event = top_assets["astronomical_event"]
+        top_banner = top_assets["banner"]
 
         # Each monitor group gets its own fingerprint now.
         bottom_visual_state = {
             "layers": layer_fingerprint(bottom_layers),
-            "astronomical_event": str(bottom_event) if bottom_event else None,
+            "banner": str(bottom_banner) if bottom_banner else None,
         }
 
         top_visual_state = {
             "layers": layer_fingerprint(top_layers),
-            "astronomical_event": str(top_event) if top_event else None,
+            "banner": str(top_banner) if top_banner else None,
         }
 
         if top_monitor_config.get("show_weather_overlay", False):
@@ -235,6 +247,7 @@ def main():
 
         bottom_wallpaper = None
         top_wallpaper = None
+        panorama_paths = None
 
         bottom_slot = previous_bottom_slot
         top_slot = previous_top_slot
@@ -244,12 +257,25 @@ def main():
             bottom_slot = next_output_slot(previous_bottom_slot)
             bottom_output_path = OUTPUT_DIR / f"current_wallpaper_bottom_{bottom_slot}.png"
             bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
-            if bottom_event:
-                bottom_wallpaper = add_top_centered_image(
-                    bottom_wallpaper,
-                    bottom_event,
-                    bottom_output_path
-                )
+            
+            if bottom_changed:
+                bottom_slot = next_output_slot(previous_bottom_slot)
+                bottom_output_path = OUTPUT_DIR / f"current_wallpaper_bottom_{bottom_slot}.png"
+                bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
+
+                if bottom_banner:
+                    bottom_wallpaper = add_top_centered_image(
+                        bottom_wallpaper,
+                        bottom_banner,
+                        bottom_output_path,
+                    )
+
+                if bottom_mode == "panorama":
+                    panorama_paths = split_panorama(
+                        bottom_wallpaper,
+                        OUTPUT_DIR,
+                        bottom_slot,
+                    )
 
         if top_changed:
             top_slot = next_output_slot(previous_top_slot)
@@ -257,10 +283,10 @@ def main():
             top_overlay_output_path = OUTPUT_DIR / f"current_wallpaper_top_overlay_{top_slot}.png"
 
             top_wallpaper = compose_wallpaper(top_layers, top_output_path)
-            if top_event:
+            if top_banner:
                 top_wallpaper = add_top_centered_image(
                     top_wallpaper,
-                    top_event,
+                    top_banner,
                     top_output_path
                 )
 
@@ -285,6 +311,9 @@ def main():
             bottom_path=str(bottom_wallpaper) if bottom_wallpaper is not None else None,
             top_path=str(top_wallpaper) if top_wallpaper is not None else None,
             top_monitor_index=top_monitor_config.get("monitor_index"),
+            bottom_mode=bottom_mode,
+            bottom_monitor_indices=bottom_monitor_indices,
+            panorama_paths=panorama_paths,
             update_bottom=bottom_changed,
             update_top=top_changed,
         )
@@ -304,11 +333,18 @@ def main():
 
     else:
         # Single-monitor mode gets the same fingerprint + double-buffer optimization.
-        layers = get_layer_paths(
+        assets = get_layer_paths(
             bucket, star_bucket, moon_bucket, season, holiday, weather, shade,
-            ASSETS_DIR, "one_monitor"
+            banner, ASSETS_DIR, "horizontal"
         )
-        visual_state = {"layers": layer_fingerprint(layers)}
+
+        layers = assets["layers"]
+        single_banner = assets["banner"]
+        
+        visual_state = {
+            "layers": layer_fingerprint(layers),
+            "banner": str(single_banner) if single_banner else None,
+        }
 
         previous_visual_state = previous_state.get("_single_visual_state")
         previous_slot = previous_state.get(
@@ -325,6 +361,13 @@ def main():
         output_slot = next_output_slot(previous_slot)
         output_path = OUTPUT_DIR / f"current_wallpaper_{output_slot}.png"
         final_wallpaper = compose_wallpaper(layers, output_path)
+
+        if single_banner:
+            final_wallpaper = add_top_centered_image(
+                final_wallpaper,
+                single_banner,
+                output_path,
+            )
 
         set_wallpaper(str(final_wallpaper))
 

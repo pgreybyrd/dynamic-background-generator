@@ -1,5 +1,6 @@
 import datetime
 
+
 # Calculate the holidays that aren't on a set date each year
 def calculate_easter(year):
     # Anonymous Gregorian algorithm (Computus)
@@ -18,6 +19,7 @@ def calculate_easter(year):
     month = (h + l - 7 * m + 114) // 31
     day = ((h + l - 7 * m + 114) % 31) + 1
     return datetime.date(year, month, day)
+
 
 def second_sunday_of_may(year):
     # Start with the first day of May
@@ -38,6 +40,7 @@ def second_sunday_of_may(year):
     # Return just the day of the month
     return second_sunday.day
 
+
 def third_sunday_of_june(year):
     # Start with the first day of June
     first_of_june = datetime.date(year, 6, 1)
@@ -56,6 +59,7 @@ def third_sunday_of_june(year):
     
     # Return just the day of the month
     return third_sunday.day
+
 
 def fourth_thursday_of_november(year):
     # Start with the first day of November
@@ -77,6 +81,7 @@ def fourth_thursday_of_november(year):
     
     # Return just the day of the month
     return fourth_thursday.day
+
 
 def get_holiday(day, month, year):
 
@@ -148,3 +153,16 @@ def get_holiday(day, month, year):
         if day == 31:
             return 'new_years_eve'   
     return 'none'
+
+
+def get_banner(holiday, astronomical_event):
+    """
+    Pick the banner artwork for today's special event.
+    """
+    if astronomical_event != "none":
+        return astronomical_event
+
+    if holiday != "none":
+        return holiday
+
+    return "none"
