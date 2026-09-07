@@ -39,10 +39,10 @@ def second_sunday_of_may(year):
     return second_sunday.day
 
 def third_sunday_of_june(year):
-    # Start with the first day of May
+    # Start with the first day of June
     first_of_june = datetime.date(year, 6, 1)
     
-    # Find the day of the week for May 1st (0 is Monday, 6 is Sunday)
+    # Find the day of the week for June 1st (0 is Monday, 6 is Sunday)
     day_of_week = first_of_june.weekday()
     
     # Calculate how many days to add to get to the first Sunday
@@ -51,7 +51,7 @@ def third_sunday_of_june(year):
     # Calculate the date of the first Sunday
     first_sunday = first_of_june + datetime.timedelta(days=days_until_first_sunday)
     
-    # The second Sunday will be exactly one week after the first Sunday
+    # The third Sunday will be exactly two weeks after the first Sunday
     third_sunday = first_sunday + datetime.timedelta(days=14)
     
     # Return just the day of the month

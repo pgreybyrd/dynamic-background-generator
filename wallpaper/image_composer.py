@@ -19,6 +19,24 @@ def add_floating_image(base_path, floating_path, output_path, position):
 
     return output_path
 
+def add_top_centered_image(base_path, floating_path, output_path):
+    # Center a floating image across the top portion of whatever canvas it is on.
+    base = Image.open(base_path)
+    floating = Image.open(floating_path)
+
+    x = (base.width - floating.width) // 2
+    y = base.height // 12
+
+    base.close()
+    floating.close()
+
+    return add_floating_image(
+        base_path,
+        floating_path,
+        output_path,
+        (x, y)
+    )
+
 def split_panorama(path, output_dir):
     img = Image.open(path).convert("RGBA")
 

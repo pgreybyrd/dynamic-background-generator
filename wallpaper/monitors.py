@@ -85,7 +85,6 @@ def set_wallpapers_per_monitor(
         if not bottom_path or not top_path:
             raise ValueError("Both wallpaper paths are required when both groups update.")
 
-        # Fast path from Pass 1: one shared refresh, then restore the vertical monitor.
         wallpaper.SetWallpaper(None, bottom_path)
         wallpaper.SetWallpaper(top_monitor_id, top_path)
         return
@@ -94,8 +93,6 @@ def set_wallpapers_per_monitor(
         if not bottom_path:
             raise ValueError("bottom_path is required for a horizontal wallpaper update.")
 
-        # Do NOT use SetWallpaper(None, ...) here: that would also refresh the
-        # vertical monitor and defeat independent group updates.
         for i in range(count):
             if i == top_monitor_index:
                 continue
