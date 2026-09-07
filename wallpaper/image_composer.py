@@ -39,22 +39,42 @@ def add_top_centered_image(base_path, floating_path, output_path):
     )
 
 
-def split_panorama(path, output_dir, slot):
+def split_panorama(path, output_dir, slot, slice_widths):
+    """
+    Split one panorama into a left-to-right image for each configured monitor.
+    """
     img = Image.open(path).convert("RGBA")
 
-    left = img.crop((0, 0, 1920, 1080))
-    middle = img.crop((1920, 0, 3840, 1080))
-    right = img.crop((3840, 0, 5760, 1080))
+    expected_width = sum(slice_widths)
 
-    left_path = output_dir / f"bottom_left_{slot}.png"
-    middle_path = output_dir / f"bottom_middle_{slot}.png"
-    right_path = output_dir / f"bottom_right_{slot}.png"
+    if img.width != expected_width:
+        raise ValueError(
+            f"Panorama is {img.width}px wide, but configured monitors "
+            f"require {expected_width}px."
+        )
 
-    left.save(left_path)
-    middle.save(middle_path)
-    right.save(right_path)
+    paths = []
+    x = 0
 
-    return left_path, middle_path, right_path
+    for index, width in enumerate(slice_widths):
+        slice_img = img.crop(
+            (
+                x,
+                0,
+                x + width,
+                img.height,
+            )
+        )
+
+        slice_path = output_dir / f"bottom_{index}_{slot}.png"
+        slice_img.save(slice_path)
+        paths.append(slice_path)
+
+        x += width
+
+    img.close()
+
+    return paths
 
 
 def compose_wallpaper(layer_paths, output_path, moon_path=None, moon_position=None):

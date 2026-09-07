@@ -176,6 +176,24 @@ def main():
         bottom_config = config.get("bottom_monitors", {})
         bottom_mode = bottom_config.get("mode", "shared")
         bottom_monitor_indices = bottom_config.get("monitor_indices")
+        bottom_monitor_widths = bottom_config.get("monitor_widths", [])
+
+        if bottom_mode == "panorama":
+            if not bottom_monitor_indices:
+                raise ValueError(
+                    "Panorama mode requires bottom_monitors.monitor_indices."
+                )
+
+            if not bottom_monitor_widths:
+                raise ValueError(
+                    "Panorama mode requires bottom_monitors.monitor_widths."
+                )
+
+            if len(bottom_monitor_indices) != len(bottom_monitor_widths):
+                raise ValueError(
+                    "bottom_monitors.monitor_indices and monitor_widths "
+                    "must contain the same number of entries."
+                )
 
         bottom_layout = "panorama" if bottom_mode == "panorama" else "horizontal"
 
@@ -207,6 +225,9 @@ def main():
         bottom_visual_state = {
             "layers": layer_fingerprint(bottom_layers),
             "banner": str(bottom_banner) if bottom_banner else None,
+            "mode": bottom_mode,
+            "monitor_indices": bottom_monitor_indices,
+            "monitor_widths": bottom_monitor_widths,
         }
 
         top_visual_state = {
@@ -257,25 +278,21 @@ def main():
             bottom_slot = next_output_slot(previous_bottom_slot)
             bottom_output_path = OUTPUT_DIR / f"current_wallpaper_bottom_{bottom_slot}.png"
             bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
-            
-            if bottom_changed:
-                bottom_slot = next_output_slot(previous_bottom_slot)
-                bottom_output_path = OUTPUT_DIR / f"current_wallpaper_bottom_{bottom_slot}.png"
-                bottom_wallpaper = compose_wallpaper(bottom_layers, bottom_output_path)
 
-                if bottom_banner:
-                    bottom_wallpaper = add_top_centered_image(
-                        bottom_wallpaper,
-                        bottom_banner,
-                        bottom_output_path,
-                    )
+            if bottom_banner:
+                bottom_wallpaper = add_top_centered_image(
+                    bottom_wallpaper,
+                    bottom_banner,
+                    bottom_output_path,
+                )
 
-                if bottom_mode == "panorama":
-                    panorama_paths = split_panorama(
-                        bottom_wallpaper,
-                        OUTPUT_DIR,
-                        bottom_slot,
-                    )
+            if bottom_mode == "panorama":
+                panorama_paths = split_panorama(
+                    bottom_wallpaper,
+                    OUTPUT_DIR,
+                    bottom_slot,
+                    bottom_monitor_widths,
+                )
 
         if top_changed:
             top_slot = next_output_slot(previous_top_slot)
