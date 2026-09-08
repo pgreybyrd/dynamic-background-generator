@@ -33,20 +33,19 @@ def get_time_bucket_by_sun(now, sunrise, sunset):
         (70, "deep_twilight"),
     ]
 
-    # Sunrise window: 60 min before to 60 min after
-    if -60 <= minutes_from_sunrise < 140:
+    # Sunrise window
+    if -60 <= minutes_from_sunrise < 60:
         return closest_bucket(minutes_from_sunrise, sunrise_buckets)
 
-    # Sunset window: 60 min before to 60 min after
-    if -90 <= minutes_from_sunset < 45:
+    # Sunset window
+    if -90 <= minutes_from_sunset <= 70:
         return closest_bucket(minutes_from_sunset, sunset_buckets)
 
     # Before sunrise
     if now < sunrise:
         if minutes_from_sunrise < -180:
             return "deep_night"
-        if minutes_from_sunrise < -120:
-            return "night"
+
         return "pre_dawn"
 
     # After sunrise, before sunset

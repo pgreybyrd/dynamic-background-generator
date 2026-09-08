@@ -30,7 +30,7 @@ def get_layer_paths(
     assets_dir,
     layout="horizontal",
     ):
-    
+
     layers = []
 
     # Base scene
@@ -110,8 +110,7 @@ def get_layer_paths(
         else None
     )
 
-    # Layer order matters! Things near the top of this list are farther back.
-    layers.extend([
+    candidate_layers = [
         optional_layer(sky_path),
         optional_layer(stars_path),
         optional_layer(moon_path),
@@ -119,7 +118,7 @@ def get_layer_paths(
         optional_layer(landscape_path),
         optional_layer(season_path),
 
-        optional_layer(clouds_path),        
+        optional_layer(clouds_path),
 
         optional_layer(holiday_path),
         optional_layer(shade_path),
@@ -131,7 +130,15 @@ def get_layer_paths(
 
         optional_layer(lightning_path),
         optional_layer(holiday_lights_path),
-    ])
+    ]
+
+    # Missing optional artwork resolves to None. Keep those placeholders out of
+    # the final layer list so everything downstream only sees artwork that exists.
+    layers.extend(
+        layer
+        for layer in candidate_layers
+        if layer is not None
+    )
 
     return {
         "layers": layers,

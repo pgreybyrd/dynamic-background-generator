@@ -12,7 +12,8 @@ def add_weather_overlay(image_path, weather_data, output_path):
     draw = ImageDraw.Draw(img)
 
     temp = weather_data.get("main", {}).get("temp")
-    description = weather_data.get("weather", [{}])[0].get("description", "").title()
+    weather_items = weather_data.get("weather") or [{}]
+    description = weather_items[0].get("description", "").title()
 
     lines = []
     if temp is not None:
